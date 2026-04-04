@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DC Badminton Club</title>
+<style>
+:root{
+  --navy:#0d2137;--navy2:#1a3a5c;--teal:#0099cc;--teal2:#00c2ff;
+  --green:#27ae60;--green2:#2ecc71;--red:#c0392b;--red2:#e74c3c;
+  --yellow:#f39c12;--yellow2:#f1c40f;--gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32;
+  --bg:#080e17;--s1:#0f1d2e;--s2:#162540;--s3:#1e3254;--s4:#243a52;
+  --border:#243a52;--text:#e8f4fd;--muted:#6a8ba8;
+  --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);padding-bottom:72px;}
+
+/* NAV */
+.nav{background:var(--navy);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 20px rgba(0,0,0,0.6);border-bottom:1px solid var(--border);}
+.nav-brand{display:flex;flex-direction:column;}
+.nav-title{font-size:15px;font-weight:800;color:#fff;}
+.nav-title span{color:var(--teal2);}
+.nav-sub{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:1px;}
+.sync-row{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--green2);flex-shrink:0;transition:background 0.3s;}
+.sdot.syncing{background:var(--yellow2);}.sdot.err{background:var(--red2);}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid var(--border);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom);}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 2px;border:none;background:transparent;color:var(--muted);font-size:8px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;cursor:pointer;gap:3px;transition:color 0.2s;}
+.bnav-btn .bi{font-size:19px;}
+.bnav-btn.active{color:var(--teal2);}
+
+/* PAGES */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes glow{from{box-shadow:0 0 4px var(--teal)}to{box-shadow:0 0 14px var(--teal2)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.page{display:none;padding:14px;max-width:600px;margin:0 auto;animation:fadeUp 0.2s ease;}
+.page.active{display:block;}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+.card-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:12px;}
+
+/* INPUTS */
+.inp{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-size:15px;transition:border 0.2s;margin-bottom:8px;}
+.inp:focus{outline:none;border-color:var(--teal);}
+.inp::placeholder{color:var(--muted);}
+select.inp{cursor:pointer;}
+textarea.inp{resize:vertical;min-height:80px;}
+.lbl{font-size:11px;color:var(--muted);margin-bottom:4px;display:block;font-weight:700;letter-spacing:0.5px;}
+
+/* BUTTONS */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.15s;width:100%;margin-top:8px;letter-spacing:0.3px;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-warn{background:var(--yellow);color:#000;}
+.btn-ghost{background:var(--s3);color:var(--text);border:1px solid var(--border);}
+.btn-sm{padding:7px 12px;font-size:12px;width:auto;margin-top:0;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;font-weight:600;}
+.alert-info{background:rgba(0,153,204,0.1);border:1px solid var(--teal);color:var(--teal2);}
+.alert-success{background:rgba(39,174,96,0.1);border:1px solid var(--green);color:var(--green2);}
+.alert-warn{background:rgba(243,156,18,0.1);border:1px solid var(--yellow);color:var(--yellow2);}
+.alert-error{background:rgba(192,57,43,0.1);border:1px solid var(--red);color:var(--red2);}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.3px;}
+.tg-teal{background:rgba(0,153,204,0.15);color:var(--teal2);border:1px solid rgba(0,153,204,0.35);}
+.tg-green{background:rgba(39,174,96,0.15);color:var(--green2);border:1px solid rgba(39,174,96,0.35);}
+.tg-red{background:rgba(192,57,43,0.15);color:var(--red2);border:1px solid rgba(192,57,43,0.35);}
+.tg-yellow{background:rgba(243,156,18,0.15);color:var(--yellow2);border:1px solid rgba(243,156,18,0.35);}
+.tg-gray{background:var(--s3);color:var(--muted);border:1px solid var(--border);}
+.tg-gold{background:rgba(255,215,0,0.15);color:var(--gold);border:1px solid rgba(255,215,0,0.35);}
+
+/* TABS */
+.ptabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none;}
+.ptabs::-webkit-scrollbar{display:none;}
+.ptab{background:var(--s2);border:1px solid transparent;color:var(--muted);font-size:12px;font-weight:700;padding:7px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.ptab.active{background:var(--teal);color:#fff;}
+.section{display:none;}.section.active{display:block;}
+
+/* ══ GYM LAYOUT ══ */
+.gym-wrap{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
+.gym-label{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:8px;}
+.gym-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;}
+.gym-court{border-radius:10px;overflow:hidden;border:2px solid var(--border);transition:border-color 0.2s;cursor:pointer;position:relative;}
+.gym-court:hover{border-color:var(--teal);}
+.gym-court.gc1{border-color:rgba(255,215,0,0.5);}
+.gym-court.gc2{border-color:rgba(192,192,192,0.4);}
+.gym-court.gc3{border-color:rgba(205,127,50,0.4);}
+.gc-header{padding:6px 8px;display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:800;}
+.gc1 .gc-header{background:linear-gradient(90deg,rgba(255,215,0,0.15),rgba(255,215,0,0.05));}
+.gc2 .gc-header{background:linear-gradient(90deg,rgba(192,192,192,0.12),rgba(192,192,192,0.04));}
+.gc3 .gc-header{background:linear-gradient(90deg,rgba(205,127,50,0.12),rgba(205,127,50,0.04));}
+.gcn .gc-header{background:var(--s2);}
+.gc-num{font-weight:900;font-size:12px;}
+.gc1 .gc-num{color:var(--gold);}
+.gc2 .gc-num{color:var(--silver);}
+.gc3 .gc-num{color:var(--bronze);}
+.gcn .gc-num{color:var(--teal2);}
+.gc-medal{font-size:10px;}
+.gc-net{height:3px;background:repeating-linear-gradient(90deg,var(--border) 0px,var(--border) 4px,transparent 4px,transparent 8px);margin:0 6px 4px;}
+.gc-players{padding:0 6px 6px;display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.gc-player{background:var(--s2);border-radius:5px;padding:4px 5px;font-size:9px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--border);position:relative;}
+.gc-player.empty{color:var(--yellow);font-style:italic;font-weight:600;border:1px dashed rgba(243,156,18,0.4);background:rgba(243,156,18,0.05);}
+.gc-player .mv{position:absolute;top:-4px;right:-2px;font-size:7px;padding:1px 3px;border-radius:6px;font-weight:800;}
+.mv-u{background:var(--green2);color:#fff;}
+.mv-d{background:var(--red2);color:#fff;}
+/* Admin add player on court */
+.gc-add-btn{display:none;position:absolute;bottom:4px;right:4px;background:var(--teal);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;align-items:center;justify-content:center;font-weight:800;}
+.admin-mode .gc-add-btn{display:flex;}
+.gc-divider{height:1px;background:var(--border);margin:0 8px 4px;position:relative;}
+.gc-divider::after{content:'NET';position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:7px;background:var(--s1);padding:0 4px;color:var(--muted);letter-spacing:1px;}
+
+/* Drag-and-drop court assignment */
+.dnd-court{background:var(--s1);border:2px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;transition:border-color 0.2s,background 0.2s;}
+.dnd-court.drag-over{border-color:var(--teal2);background:rgba(0,153,204,0.08);}
+.dnd-court-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.dnd-court-title{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+.dnd-court-cnt{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.dnd-slots{display:grid;grid-template-columns:1fr 1fr;gap:6px;min-height:36px;}
+.dnd-player{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;cursor:grab;transition:all 0.15s;display:flex;justify-content:space-between;align-items:center;}
+.dnd-player:active{cursor:grabbing;opacity:0.7;}
+.dnd-player.dragging{opacity:0.3;border-style:dashed;}
+.dnd-empty{background:rgba(243,156,18,0.05);border:1px dashed rgba(243,156,18,0.4);border-radius:8px;padding:8px 10px;font-size:11px;font-weight:600;color:var(--yellow);font-style:italic;text-align:center;}
+
+/* Gym walls */
+.gym-wall{background:var(--s2);border-radius:6px;padding:4px 8px;text-align:center;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;border:1px solid var(--border);}
+
+/* ══ CYCLE BAR ══ */
+.cybar{display:flex;gap:5px;margin-bottom:14px;}
+.cyseg{flex:1;height:5px;border-radius:3px;background:var(--s3);}
+.cyseg.done{background:var(--teal);}
+.cyseg.act{background:var(--teal2);animation:glow 1.2s ease-in-out infinite alternate;}
+
+/* ══ LIST COURT VIEW ══ */
+.court-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.court-header{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.lc1 .court-header{background:linear-gradient(90deg,rgba(255,215,0,0.07),transparent);}
+.lc2 .court-header{background:linear-gradient(90deg,rgba(192,192,192,0.07),transparent);}
+.lc3 .court-header{background:linear-gradient(90deg,rgba(205,127,50,0.07),transparent);}
+.cnum{font-weight:800;font-size:16px;}
+.lc1 .cnum{color:var(--gold);}.lc2 .cnum{color:var(--silver);}.lc3 .cnum{color:var(--bronze);}.lcn .cnum{color:var(--teal2);}
+.cbadge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.lc1 .cbadge{background:var(--gold);color:#000;}.lc2 .cbadge{background:var(--silver);color:#000;}
+.lc3 .cbadge{background:var(--bronze);color:#fff;}.lcn .cbadge{background:var(--s3);color:var(--muted);border:1px solid var(--border);}
+.court-players{padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.pslot{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;font-weight:700;text-align:center;position:relative;}
+.pslot.empty{color:var(--yellow);font-style:italic;font-weight:600;border:1px dashed rgba(243,156,18,0.4);background:rgba(243,156,18,0.05);}
+.mbadge{position:absolute;top:-7px;right:-4px;font-size:9px;padding:2px 6px;border-radius:10px;font-weight:800;}
+.mu{background:var(--green2);color:#fff;}.md{background:var(--red2);color:#fff;}
+
+/* ══ SCORE ENTRY ══ */
+.game-block{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px;}
+.glabel{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.grow{display:grid;grid-template-columns:1fr 34px 1fr;gap:8px;align-items:center;}
+.tcol{text-align:center;}
+.tnames{font-size:11px;color:var(--muted);margin-bottom:5px;line-height:1.3;}
+.sinp{width:100%;background:var(--s1);border:2px solid var(--border);border-radius:8px;padding:8px 4px;color:var(--text);font-size:28px;font-weight:800;text-align:center;transition:border 0.2s;}
+.sinp:focus{outline:none;border-color:var(--teal);}
+.sinp.win{border-color:var(--green2);background:rgba(46,204,113,0.08);}
+.sinp.lose{color:var(--muted);}
+.vs{text-align:center;font-size:11px;font-weight:800;color:var(--muted);}
+.saved-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(39,174,96,0.15);border:1px solid var(--green);color:var(--green2);}
+
+/* ══ LEADERBOARD ══ */
+.lbrow{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;margin-bottom:7px;background:var(--s1);border:1px solid var(--border);}
+.lbrank{font-size:16px;font-weight:900;width:28px;text-align:center;flex-shrink:0;}
+.r1{color:var(--gold);}.r2{color:var(--silver);}.r3{color:var(--bronze);}.rn{color:var(--muted);}
+.lbinfo{flex:1;min-width:0;}
+.lbname{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lbsub{font-size:11px;color:var(--muted);margin-top:1px;}
+.lbnums{display:flex;gap:8px;}
+.lbnum .v{font-size:17px;font-weight:800;color:var(--teal2);}
+.lbnum .l{font-size:9px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;}
+
+/* ══ VOTING ══ */
+.vote-card{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;margin-bottom:7px;background:var(--s1);border:1px solid var(--border);justify-content:space-between;}
+.vote-card-info{flex:1;min-width:0;}
+.vote-card-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vote-card-count{font-size:13px;color:var(--teal2);font-weight:700;margin-right:10px;}
+.vote-btn{padding:6px 12px;font-size:12px;background:var(--teal);border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:700;transition:background 0.2s;}
+.vote-btn:hover{background:var(--teal2);}
+.vote-banner{background:linear-gradient(90deg,var(--gold),var(--yellow));padding:12px 14px;border-radius:8px;margin-bottom:10px;font-weight:800;text-align:center;color:#000;}
+
+/* ══ REGISTRATION ══ */
+.reg-step{display:none;}.reg-step.active{display:block;}
+.step-ind{display:flex;gap:8px;margin-bottom:20px;align-items:center;}
+.sdot-s{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.sdot-s.done{background:var(--green);color:#fff;}
+.sdot-s.act{background:var(--teal);color:#fff;}
+.sdot-s.pend{background:var(--s3);color:var(--muted);}
+.sline{flex:1;height:2px;background:var(--s3);border-radius:1px;}
+.sline.done{background:var(--teal);}
+.waiver-box{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:14px;max-height:260px;overflow-y:auto;margin-bottom:12px;font-size:12px;line-height:1.7;color:var(--muted);}
+.waiver-box h4{color:var(--teal2);font-size:12px;margin:12px 0 6px;}
+.chk-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;cursor:pointer;}
+.chk-row input{width:18px;height:18px;flex-shrink:0;margin-top:2px;accent-color:var(--teal);}
+.chk-row span{font-size:13px;line-height:1.5;}
+
+/* ══ HOME ══ */
+.hero{background:linear-gradient(135deg,var(--navy2),var(--navy));border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px;text-align:center;position:relative;overflow:hidden;}
+.hero::before{content:'🏸';position:absolute;font-size:120px;opacity:0.05;top:-10px;right:-10px;pointer-events:none;}
+.hero-club{font-size:22px;font-weight:900;color:#fff;}
+.hero-club span{color:var(--teal2);}
+.hero-league{font-size:13px;color:var(--muted);margin:4px 0 14px;}
+.hero-next{background:rgba(0,153,204,0.1);border:1px solid rgba(0,153,204,0.3);border-radius:10px;padding:12px;}
+.hero-next-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);font-weight:800;margin-bottom:4px;}
+.hero-next-date{font-size:18px;font-weight:800;color:#fff;}
+.hero-next-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.countdown{display:flex;gap:10px;justify-content:center;margin-top:12px;}
+.cd-box{background:var(--s2);border-radius:8px;padding:8px 12px;text-align:center;flex:1;}
+.cd-num{font-size:22px;font-weight:900;color:var(--teal2);}
+.cd-lbl{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.ann-card{border-radius:12px;padding:14px;margin-bottom:10px;}
+.ann-info{background:rgba(0,153,204,0.07);border:1px solid rgba(0,153,204,0.2);border-left:4px solid var(--teal);}
+.ann-warn{background:rgba(243,156,18,0.07);border:1px solid rgba(243,156,18,0.2);border-left:4px solid var(--yellow);}
+.ann-success{background:rgba(39,174,96,0.07);border:1px solid rgba(39,174,96,0.2);border-left:4px solid var(--green);}
+.ann-title{font-size:13px;font-weight:800;margin-bottom:4px;}
+.ann-body{font-size:12px;color:var(--muted);line-height:1.5;}
+.ann-time{font-size:10px;color:var(--muted);margin-top:6px;}
+
+/* ══ STATS HEATMAP ══ */
+.heatmap-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.heatmap-name{font-size:12px;font-weight:700;width:100px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.heatmap-cells{display:flex;gap:3px;flex:1;}
+.hm-cell{flex:1;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
+
+/* ══ MISC ══ */
+.page-title{font-size:20px;font-weight:800;margin-bottom:2px;}
+.page-sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+.flex-between{display:flex;justify-content:space-between;align-items:center;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty-state .ei{font-size:44px;margin-bottom:12px;}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.sbox{background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:13px;text-align:center;}
+.sbox .sv{font-size:24px;font-weight:800;color:var(--teal2);}
+.sbox .sl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
+.pay-row{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--s1);border:1px solid var(--border);border-radius:10px;margin-bottom:7px;}
+.sched-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--s1);border:1px solid var(--border);border-radius:10px;margin-bottom:7px;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;}
+
+/* MODAL */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:300;align-items:center;justify-content:center;padding:16px;}
+.modal-ov.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;}
+.modal h3{font-size:16px;font-weight:800;color:var(--teal2);margin-bottom:14px;}
+
+/* PLAYER OF SESSION BADGE */
+.pos-banner{background:linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,165,0,0.08));border:1px solid rgba(255,215,0,0.4);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center;}
+.pos-crown{font-size:32px;margin-bottom:6px;}
+.pos-title{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:4px;}
+.pos-name{font-size:20px;font-weight:900;color:#fff;}
+.pos-stat{font-size:12px;color:var(--muted);margin-top:4px;}
+
+/* WHATSAPP SHARE */
+.wa-btn{background:#25d366;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;justify-content:center;margin-top:8px;}
+
+/* CHECKLIST */
+.checklist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.chk-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.chk-ok{background:rgba(39,174,96,0.2);color:var(--green2);}
+.chk-no{background:rgba(192,57,43,0.2);color:var(--red2);}
+.chk-warn{background:rgba(243,156,18,0.2);color:var(--yellow2);}
+
+/* View toggle */
+.view-toggle{display:flex;gap:6px;margin-bottom:12px;}
+.vt-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.2s;}
+.vt-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+/* Admin mode indicator */
+.admin-bar{background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.3);border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--yellow2);}
+
+/* INVITE GATE */
+#invite-gate{display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:9999;flex-direction:column;gap:20px;padding:20px;}
+#invite-gate.hidden{display:none;}
+.invite-card{background:var(--s2);border:2px solid var(--border);border-radius:12px;padding:30px;text-align:center;max-width:400px;width:100%;}
+.invite-card h2{font-size:24px;margin-bottom:8px;color:var(--text);}
+.invite-card p{font-size:13px;color:var(--muted);margin-bottom:20px;}
+.invite-inp{width:100%;padding:12px;font-size:16px;text-align:center;letter-spacing:2px;border:1px solid var(--border);background:var(--s1);color:var(--text);border-radius:8px;margin-bottom:12px;}
+.invite-btn{width:100%;padding:12px;background:var(--teal);color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+.invite-btn:hover{background:var(--teal2);}
+.invite-err{color:var(--red2);font-size:12px;}
+.reg-gate-banner{background:var(--yellow);color:#000;padding:12px;text-align:center;font-weight:700;font-size:13px;border-radius:6px;margin-bottom:10px;}
+.rsvp-card{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.rsvp-name{font-weight:700;font-size:13px;}
+.rsvp-btns{display:flex;gap:6px;}
+.rsvp-btn{padding:6px 12px;font-size:11px;border:0;border-radius:6px;cursor:pointer;background:var(--s3);color:var(--text);}
+.rsvp-btn.coming{background:var(--green);color:#fff;}
+.rsvp-btn.notcoming{background:var(--red);color:#fff;}
+.admin-highlight{background:var(--yellow2);}
+/* Membership type boxes */
+.membership-box{background:var(--s2);border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;transition:all 0.2s;cursor:pointer;}
+.membership-box.active-box{border-color:var(--teal);background:rgba(0,153,204,0.1);}
+/* Spare badge */
+.spare-badge{display:inline-flex;align-items:center;font-size:9px;font-weight:800;padding:2px 6px;border-radius:8px;background:rgba(243,156,18,0.18);color:var(--yellow2);border:1px solid rgba(243,156,18,0.4);margin-left:5px;letter-spacing:0.3px;}
+/* Pending approval banner */
+.pending-banner{background:rgba(243,156,18,0.1);border:2px solid var(--yellow);border-radius:10px;padding:16px;margin-bottom:14px;text-align:center;}
+/* Q&A */
+.qa-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;}
+.qa-q{font-size:13px;font-weight:700;margin-bottom:4px;}
+.qa-meta{font-size:11px;color:var(--muted);margin-bottom:8px;}
+.qa-ans{background:rgba(0,153,204,0.08);border-left:3px solid var(--teal);padding:8px 10px;border-radius:0 6px 6px 0;font-size:12px;margin-top:8px;}
+.qa-unanswered{color:var(--yellow2);font-size:11px;font-style:italic;margin-top:6px;}
+/* Court warning */
+.court-warn{border-color:var(--red2)!important;background:rgba(192,57,43,0.07);}
+.court-warn-label{color:var(--red2)!important;}
+/* Waitlist badge */
+.waitlist-badge{display:inline-flex;align-items:center;font-size:9px;font-weight:800;padding:2px 6px;border-radius:8px;background:rgba(0,153,204,0.15);color:var(--teal2);border:1px solid rgba(0,153,204,0.4);margin-left:5px;letter-spacing:0.3px;}
+/* Attendance */
+.att-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.att-btn{padding:5px 10px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;}
+.att-present{background:var(--green);color:#fff;}
+.att-absent{background:var(--red);color:#fff;}
+.att-unmarked{background:var(--s3);color:var(--muted);}
+/* Admin notes */
+.notes-btn{background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.4);color:var(--yellow2);border-radius:6px;padding:4px 7px;font-size:11px;cursor:pointer;font-weight:700;}
+/* Player number badge */
+.pl-num{width:24px;height:24px;border-radius:50%;background:var(--s3);color:var(--muted);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div id="invite-gate">
+  <div class="invite-card">
+    <h2>🏸 DC Badminton Club</h2>
+    <p>Enter your invite code to continue</p>
+    <input type="text" class="invite-inp" id="invite-code-input" placeholder="INVITE CODE" autocomplete="off">
+    <button class="invite-btn" onclick="submitInviteCode()">Enter</button>
+    <div class="invite-err" id="invite-err"></div>
+  </div>
+</div>
+
+
+<nav class="nav">
+  <div class="nav-brand">
+    <div class="nav-title"><span>DC</span> Badminton Club</div>
+    <div class="nav-sub">Maplewood League · Apr–May 2026</div>
+  </div>
+  <div class="sync-row">
+    <div class="sdot" id="sdot"></div>
+    <span id="slbl">Connecting</span>
+  </div>
+</nav>
+
+<!-- ══ HOME ══ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-club"><span>DC</span> Badminton Club</div>
+    <div class="hero-league">Maplewood Advanced League · 8 Sessions</div>
+    <div class="hero-next">
+      <div class="hero-next-lbl">Next Session</div>
+      <div class="hero-next-date" id="next-date">Loading...</div>
+      <div class="hero-next-sub">Maplewood SS · 8:15–10:15 PM · Gym 127C & 127D</div>
+    </div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+  <div id="pos-home"></div>
+  <div id="ann-home"></div>
+  <div class="card" id="quick-access-card">
+    <div class="card-title">Quick Access</div>
+    <div id="quick-access-btns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+  </div>
+  <div id="admin-checklist-home"></div>
+</div>
+
+<!-- ══ REGISTER ══ -->
+<div id="page-register" class="page">
+  <div class="page-title">Register</div>
+  <div class="page-sub">Join the Maplewood League</div>
+  <div id="reg-already" style="display:none;"></div>
+  <div id="reg-form">
+    <div class="step-ind">
+      <div class="sdot-s act" id="sd1">1</div><div class="sline" id="sl1"></div>
+      <div class="sdot-s pend" id="sd2">2</div><div class="sline" id="sl2"></div>
+      <div class="sdot-s pend" id="sd3">3</div><div class="sline" id="sl3"></div>
+      <div class="sdot-s pend" id="sd4">✓</div>
+    </div>
+    <!-- Step 1: Membership Type + Personal Details -->
+    <div class="reg-step active" id="rs1">
+      <div class="card">
+        <div class="card-title">Membership Type</div>
+        <div id="reg-capacity-banner"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <label id="mt-regular-lbl" style="cursor:pointer;">
+            <input type="radio" name="membership-type" id="mt-regular" value="regular" checked style="display:none;">
+            <div id="mt-regular-box" class="membership-box active-box" onclick="selectMembership('regular')">
+              <div style="font-size:22px;margin-bottom:6px;">🏸</div>
+              <div style="font-weight:800;font-size:14px;">Regular</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">$150 · Full season</div>
+              <div style="font-size:11px;margin-top:4px;" id="reg-slots-text">Loading...</div>
+            </div>
+          </label>
+          <label id="mt-spare-lbl" style="cursor:pointer;">
+            <input type="radio" name="membership-type" id="mt-spare" value="spare" style="display:none;">
+            <div id="mt-spare-box" class="membership-box" onclick="selectMembership('spare')">
+              <div style="font-size:22px;margin-bottom:6px;">🔄</div>
+              <div style="font-weight:800;font-size:14px;">Spare</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Fill-in when needed</div>
+              <div style="font-size:11px;color:var(--teal2);margin-top:4px;">No cap · Always open</div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Personal Details</div>
+        <label class="lbl">Full Name *</label><input class="inp" id="r-name" placeholder="Your full name">
+        <label class="lbl">Email Address *</label><input class="inp" id="r-email" type="email" placeholder="your@email.com">
+        <label class="lbl">Phone Number *</label><input class="inp" id="r-phone" type="tel" placeholder="613-xxx-xxxx">
+        <label class="lbl">Emergency Contact (Name & Phone) *</label><input class="inp" id="r-emergency" placeholder="Name, phone number">
+        <label class="lbl">Medical conditions or allergies (optional)</label>
+        <textarea class="inp" id="r-medical" placeholder="Leave blank if none"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="regStep1()">Continue →</button>
+    </div>
+    <!-- Step 2: Waiver -->
+    <div class="reg-step" id="rs2">
+      <div class="card">
+        <div class="card-title">Waiver & Rules</div>
+        <div class="waiver-box">
+          <p><strong style="color:var(--text);">DC Badminton Club — Maplewood Ladder League</strong><br>
+          <em style="color:var(--muted);font-size:11px;">Privately organized recreational badminton group operated by Christy George (individual organizer) — not a registered corporation or non-profit</em><br>
+          700 Cope Drive, Stittsville · Tuesdays 8:15–10:15 PM · Apr 7 – May 26, 2026</p>
+
+          <h4>1. Nature of the Activity & Group</h4>
+          <p>DC Badminton Club is a privately organized recreational badminton group. It is not a registered corporation, non-profit, or incorporated association. All sessions are organized by Christy George (individual). By registering, I understand and accept this context and voluntarily choose to participate.</p>
+
+          <h4>2. Assumption of Risk</h4>
+          <p>I understand that participating in badminton involves inherent risks of physical injury including but not limited to muscle strains, sprains, falls, collisions, and eye injuries. I voluntarily and knowingly assume full responsibility for all risks, injuries, or damages that may occur as a result of my participation in DC Badminton Club activities.</p>
+
+          <h4>3. Release of Liability</h4>
+          <p>I hereby release, waive, and discharge Christy George (individual organizer), any co-organizers, volunteers operating under the DC Badminton Club name, and OCDSB (Ottawa-Carleton District School Board) from any and all claims, liabilities, expenses, or legal actions arising from ordinary negligence related to injuries, losses, or damages incurred during participation. <strong>Note:</strong> Ontario law does not permit waivers for gross negligence or intentional misconduct — this release covers ordinary negligence only.</p>
+
+          <h4>4. Physical Condition & Medical</h4>
+          <p>I certify that I am in good physical condition and have no medical conditions that prevent me from safely participating in badminton. If I have medical concerns, I have consulted a physician and obtained clearance. I agree to notify the organizer immediately of any discomfort, pain, or medical issues that arise during participation. DC Badminton Club is not responsible for medical or emergency costs arising from my participation.</p>
+
+          <h4>5. Age Requirement</h4>
+          <p>This league is for adults aged 18 and over. Participants under 18 must have a parent or legal guardian sign a separate physical waiver form and accompany them or provide written consent. By registering through this app, I confirm I am 18 years of age or older, or that proper guardian consent has been arranged with the organizer directly.</p>
+
+          <h4>6. OCDSB Facility Rules</h4>
+          <p>• Non-marking, soft-soled indoor shoes are mandatory at all times<br>
+          • No food or drinks in the gymnasium<br>
+          • No alcohol, smoking, vaping or cannabis on school premises<br>
+          • Do not arrive before 8:15 PM; vacate by 10:15 PM sharp<br>
+          • Remain in designated gymnasium areas only<br>
+          • No nuts, nut products, shellfish or latex items on premises<br>
+          • No aggressive behaviour, coarse language, or discrimination of any kind<br>
+          • Only custodians may adjust mechanical or building equipment</p>
+
+          <h4>7. Personal Belongings</h4>
+          <p>DC Badminton Club and OCDSB are not responsible for lost, stolen, or damaged personal belongings while at the facility. Players are responsible for their own equipment and valuables. Leave valuables at home.</p>
+
+          <h4>8. Strict Non-Refundable Payment Policy (No Exceptions)</h4>
+          <p>All fees paid to DC Badminton Club are final, non-negotiable, and non-refundable under any circumstances, including but not limited to: personal schedule conflicts, illness or injury, relocation, missed sessions, or cancellations due to bad weather, facility closures, or OCDSB/city-imposed shutdowns. Sessions will not be rescheduled or credited unless the organizer cancels for their own internal reasons. Registration is only confirmed upon receipt of full payment.</p>
+
+          <h4>9. E-Transfer Payment</h4>
+          <p>If paying by e-transfer, it is solely my responsibility to ensure payment is received and confirmed at christygeorge993@gmail.com. If an e-transfer is not received, not confirmed, or rejected, my registration will be considered incomplete and I will not be permitted to participate until resolved.</p>
+
+          <h4>10. Media Consent</h4>
+          <p>I grant permission to DC Badminton Club to use photographs or videos of me taken during sessions or events for promotional purposes including social media and the club website, at no compensation. To revoke this consent, I must submit a written request to the organizer.</p>
+
+          <h4>11. Personal Information &amp; Privacy</h4>
+          <p>I consent to DC Badminton Club collecting and using my personal information (name, email, phone, emergency contact, and any medical notes) solely for the purpose of administering the league. This information will not be sold or shared with third parties. It will be retained for the duration of the league season and may be deleted upon request.</p>
+
+          <h4>12. Consent &amp; Agreement</h4>
+          <p>By checking the boxes below and entering my digital signature, I confirm I have read, understood, and fully agree to all terms of this Liability Waiver, Activity Release, and Payment Policy. I understand this is a voluntary private recreational arrangement. This constitutes a binding digital agreement between me and Christy George (individual organizer).</p>
+        </div>
+        <div class="chk-row"><input type="checkbox" id="w1"><span>I have read and agree to all OCDSB facility rules, safety guidelines, and conduct standards</span></div>
+        <div class="chk-row"><input type="checkbox" id="w2"><span>ALL FEES ARE NON-REFUNDABLE under any circumstances — no exceptions for illness, weather, cancellations, or schedule conflicts</span></div>
+        <div class="chk-row"><input type="checkbox" id="w3"><span>I release DC Badminton Club, its organizers, volunteers, and OCDSB from any and all claims arising from my participation</span></div>
+        <div class="chk-row"><input type="checkbox" id="w4"><span>I am physically fit with no medical conditions preventing safe participation; if medical concerns exist, I have physician clearance</span></div>
+        <div class="chk-row"><input type="checkbox" id="w7"><span>I understand my e-transfer is my responsibility to confirm — unconfirmed or rejected payments mean my registration is incomplete</span></div>
+        <div class="chk-row"><input type="checkbox" id="w8"><span>I consent to photos/videos taken during sessions being used by DC Badminton Club for promotional purposes, and agree to the collection of my personal information for league administration only</span></div>
+        <div class="chk-row"><input type="checkbox" id="w9"><span>I confirm I am <strong>18 years of age or older</strong>. I understand this is an adult recreational league and participation by minors requires separate written guardian consent arranged with the organizer</span></div>
+        <div class="chk-row" id="w5-row" style="display:none;"><input type="checkbox" id="w5"><span>I have made the e-transfer payment of <strong>$150</strong> to <strong>christygeorge993@gmail.com</strong></span></div>
+        <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$24.50 per session</strong> each time I am called in to play. This fee is due before or on the session date via e-transfer to <strong>christygeorge993@gmail.com</strong></span></div>
+        <label class="lbl" style="margin-top:8px;">Digital Signature (type full name) *</label>
+        <input class="inp" id="r-sig" placeholder="Your full name as signature">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">⚠️ By typing your name you confirm this is a legally binding digital signature</div>
+      </div>
+      <button class="btn btn-primary" id="reg-btn" onclick="regStep2()">Continue →</button>
+      <button class="btn btn-ghost" onclick="goRS(1)">← Back</button>
+    </div>
+    <!-- Step 3: League Rules -->
+    <div class="reg-step" id="rs3">
+      <div class="card">
+        <div class="card-title">League Format & Rules</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Please read all rules carefully before agreeing.</div>
+        <ol style="padding-left:18px;margin:0 0 16px;display:flex;flex-direction:column;gap:9px;">
+          <li style="font-size:13px;line-height:1.5;">Arrive 5 minutes early. If late by more than 5 minutes, you will be moved to the last court.</li>
+          <li style="font-size:13px;line-height:1.5;">Warm-up is limited to 5 minutes at the start. Once games begin, no more warm-ups are allowed.</li>
+          <li style="font-size:13px;line-height:1.5;">Each court is allotted 8 shuttlecocks (2 per player). Extra shuttlecocks must be provided by players.</li>
+          <li style="font-size:13px;line-height:1.5;">Games are played to 21 points. First to reach 21 wins, even at 20-20. No deuce.</li>
+          <li style="font-size:13px;line-height:1.5;">Scores are entered by one person per court after confirming with all players. The app shows exactly who plays who in each game (Game 1: A+B vs C+D · Game 2: A+C vs B+D · Game 3: A+D vs B+C).</li>
+          <li style="font-size:13px;line-height:1.5;">The top scorer per court moves UP, the lowest scorer moves DOWN each cycle — no exceptions.</li>
+          <li style="font-size:13px;line-height:1.5;">Remaining shuttlecocks are distributed to top scorers per court starting from Court 1.</li>
+          <li style="font-size:13px;line-height:1.5;">New shuttlecocks are ONLY for official ladder matches. Use old/used shuttlecocks while waiting between cycles or during casual play.</li>
+          <li style="font-size:13px;line-height:1.5;">The court where you finish each session is your starting court the following week. Court positions carry over week to week.</li>
+          <li style="font-size:13px;line-height:1.5;">All court allocations are final and decided by the admin. If a higher-caliber spare player joins, you may be displaced from your court position.</li>
+          <li style="font-size:13px;line-height:1.5;">Maintain respectful communication and resolve disputes through the admin only. League polls may be conducted via the Facebook group.</li>
+          <li style="font-size:13px;line-height:1.5;">Missing a session without notice will move your court one down at the start of the following session. Repeated unexcused absences may result in losing your spot to a waitlist player.</li>
+          <li style="font-size:13px;line-height:1.5;">Bring your own water bottle and towel. No glass containers in the gymnasium. Wear non-marking indoor shoes at all times.</li>
+        </ol>
+        <div class="chk-row" style="background:rgba(0,153,204,0.08);border:1px solid rgba(0,153,204,0.3);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+          <input type="checkbox" id="lf-all">
+          <span style="font-weight:700;font-size:13px;">I have read and agree to all of the league format rules listed above.</span>
+        </div>
+        <label class="lbl">Digital Signature (type full name) *</label>
+        <input class="inp" id="r-sig-lf" placeholder="Your full name as signature">
+      </div>
+      <button class="btn btn-primary" id="reg-btn-lf" onclick="regStep3()">Submit Registration →</button>
+      <button class="btn btn-ghost" onclick="goRS(2)">← Back</button>
+    </div>
+    <!-- Step 4: Confirmation -->
+    <div class="reg-step" id="rs4">
+      <div style="text-align:center;padding:30px 10px;">
+        <div style="font-size:56px;margin-bottom:16px;">🎉</div>
+        <div style="font-size:20px;font-weight:800;margin-bottom:8px;">Registration Submitted!</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:20px;" id="reg-success-msg">Your registration is pending admin approval.</div>
+        <div class="alert alert-warn" id="reg-payment-note">⚠️ E-transfer $150 to:<br><strong>christygeorge993@gmail.com</strong><br><small>Use your name as the message</small></div>
+        <div class="alert alert-info" id="reg-spare-payment-note" style="display:none;">💡 As a spare, you pay <strong>$24.50 per session</strong> when called in.<br>E-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</div>
+        <div class="alert alert-info">📍 Maplewood Secondary School<br>700 Cope Drive, Stittsville · Gym 127C & 127D</div>
+        <div class="alert alert-success">✅ First session: <strong>Tuesday April 7, 2026 at 8:15 PM</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COURTS ══ -->
+<div id="page-courts" class="page">
+  <div class="flex-between" style="margin-bottom:10px;">
+    <div><div class="page-title">Courts</div><div class="page-sub" id="courts-sub" style="margin:0;">Loading...</div></div>
+    <div id="admin-court-badge"></div>
+  </div>
+  <div class="cybar" id="cybar"></div>
+  <div class="view-toggle">
+    <button class="vt-btn active" id="vt-gym" onclick="setView('gym',this)">🏟️ Gym View</button>
+    <button class="vt-btn" id="vt-list" onclick="setView('list',this)">📋 List View</button>
+  </div>
+  <div id="court-gym-view"></div>
+  <div id="court-list-view" style="display:none;"></div>
+  <div id="admin-court-panel" style="display:none;"></div>
+</div>
+
+<!-- ══ SCORES ══ -->
+<div id="page-scores" class="page">
+  <div class="page-title">Enter Scores</div>
+  <div class="page-sub">All players enter scores after each game</div>
+  <div class="card">
+    <label class="lbl">Select Your Court</label>
+    <select class="inp" id="sc-sel" onchange="renderScoreEntry()" style="margin:0;">
+      <option value="">— Choose Court —</option>
+      <option value="1">Court 1</option><option value="2">Court 2</option>
+      <option value="3">Court 3</option><option value="4">Court 4</option>
+      <option value="5">Court 5</option><option value="6">Court 6</option>
+    </select>
+  </div>
+  <div id="score-area"></div>
+</div>
+
+<!-- ══ STANDINGS ══ -->
+<div id="page-standings" class="page">
+  <div class="page-title">Standings</div>
+  <div class="page-sub">Season · Apr 7 – May 26, 2026</div>
+  <div id="pos-standings"></div>
+  <div class="ptabs">
+    <button class="ptab active" onclick="showSec('standings','lb',this)">🏆 Leaders</button>
+    <button class="ptab" onclick="showSec('standings','pstats',this)">📊 Stats</button>
+    <button class="ptab" onclick="showSec('standings','heat',this)">🔥 Heatmap</button>
+    <button class="ptab" onclick="showSec('standings','hist',this)">📅 History</button>
+    <button class="ptab" onclick="showSec('standings','vote',this)">📋 RSVP</button>
+    <button class="ptab" onclick="showSec('standings','qa',this)">❓ Q&amp;A</button>
+  </div>
+  <div id="sec-lb" class="section active"></div>
+  <div id="sec-pstats" class="section"></div>
+  <div id="sec-heat" class="section"></div>
+  <div id="sec-hist" class="section"></div>
+  <div id="sec-vote" class="section"></div>
+  <div id="sec-qa" class="section"></div>
+</div>
+
+<!-- ══ SCHEDULE ══ -->
+<div id="page-schedule" class="page">
+  <div class="page-title">Schedule</div>
+  <div class="page-sub">8 Sessions · Every Tuesday</div>
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;">
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">8:15 PM</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Start</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">10:15 PM</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">End</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">6</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Courts</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">$150</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Season</div></div>
+    </div>
+  </div>
+  <div id="sched-list"></div>
+  <div class="card">
+    <div class="card-title">Venue</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Maplewood Secondary School</div>
+    <div style="font-size:13px;color:var(--muted);">700 Cope Drive, Stittsville, ON K2V 0B9</div>
+    <div style="font-size:13px;color:var(--muted);">Gymnasium · Rooms 127C & 127D</div>
+    <div style="font-size:12px;color:var(--teal2);margin-top:8px;">🏫 Brand new school · Excellent ceiling · Top-quality floors</div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="page-admin" class="page">
+  <div id="admin-lock">
+    <div style="text-align:center;padding:50px 20px;">
+      <div style="font-size:52px;margin-bottom:16px;">🔒</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">Admin Access</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:20px;">Enter your PIN to continue</div>
+      <input class="inp" type="password" id="pin-inp" placeholder="••••••" style="text-align:center;font-size:26px;letter-spacing:10px;max-width:200px;display:block;margin:0 auto 10px;" maxlength="8" onkeydown="if(event.key==='Enter')checkPin()">
+      <button class="btn btn-primary" style="max-width:220px;margin:0 auto;" onclick="checkPin()">Unlock</button>
+      <div id="pin-err" style="display:none;margin-top:12px;" class="alert alert-error"></div>
+    </div>
+  </div>
+  <div id="admin-panel" style="display:none;">
+    <div class="flex-between" style="margin-bottom:14px;">
+      <div><div class="page-title">Admin</div><div class="page-sub" style="margin:0;">Full control</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="lockAdmin()">🔒 Lock</button>
+    </div>
+    <div class="admin-bar">⚙️ Admin Mode Active <span class="tag tg-yellow">All features unlocked</span></div>
+    <div class="ptabs">
+      <button class="ptab active" onclick="showSec('admin','a-pl',this)">👥 Players</button>
+      <button class="ptab" onclick="showSec('admin','a-reg',this)" id="tab-a-reg">📋 Registered <span id="reg-pending-badge" style="display:none;background:var(--red2);color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;margin-left:3px;font-weight:800;"></span></button>
+      <button class="ptab" onclick="showSec('admin','a-sess',this)">📅 Session</button>
+      <button class="ptab" onclick="showSec('admin','a-assign',this)">🏟️ Assign</button>
+      <button class="ptab" onclick="showSec('admin','a-pay',this)">💰 Pay</button>
+      <button class="ptab" onclick="showSec('admin','a-ann',this)">📣 Announce</button>
+      <button class="ptab" onclick="showSec('admin','a-tools',this)">🛠 Tools</button>
+    </div>
+    <div id="sec-a-reg" class="section"></div>
+    <div id="sec-a-pl" class="section active">
+      <div class="card">
+        <div class="card-title">➕ Add Player</div>
+        <label class="lbl">Full Name</label><input class="inp" id="np-name" placeholder="Full name">
+        <label class="lbl">Membership Type</label>
+        <select class="inp" id="np-membership">
+          <option value="regular">🏸 Regular ($150/season)</option>
+          <option value="spare">🔄 Spare ($24.50/session)</option>
+        </select>
+        <label class="lbl">Starting Court</label>
+        <select class="inp" id="np-court">
+          <option value="1">Court 1</option><option value="2">Court 2</option>
+          <option value="3" selected>Court 3</option><option value="4">Court 4</option>
+          <option value="5">Court 5</option><option value="6">Court 6</option>
+        </select>
+        <button class="btn btn-primary" onclick="addPlayer()">+ Add Player</button>
+      </div>
+      <div id="a-pl-court-summary"></div>
+      <div id="a-pl-list"></div>
+    </div>
+    <div id="sec-a-sess" class="section"><div id="sess-ui"></div></div>
+    <div id="sec-a-assign" class="section">
+      <div class="alert alert-info">Assign exactly 4 players per court. Court 1 = best level.</div>
+      <div id="assign-rebalance-btn"></div>
+      <div id="assign-ui"></div>
+      <button class="btn btn-success" onclick="saveAssignments()">💾 Save Assignments</button>
+    </div>
+    <div id="sec-a-pay" class="section">
+      <div class="card"><div class="card-title">💰 Payment Tracker</div><div id="pay-summary"></div></div>
+      <div id="pay-list"></div>
+    </div>
+    <div id="sec-a-ann" class="section">
+      <div class="card">
+        <div class="card-title">📣 Post Announcement</div>
+        <label class="lbl">Type</label>
+        <select class="inp" id="ann-type"><option value="info">ℹ️ Info</option><option value="warn">⚠️ Warning</option><option value="success">✅ Good news</option></select>
+        <label class="lbl">Title</label><input class="inp" id="ann-title" placeholder="e.g. Session update">
+        <label class="lbl">Message</label><textarea class="inp" id="ann-body" placeholder="Your message..."></textarea>
+        <button class="btn btn-primary" onclick="postAnn()">📣 Post</button>
+      </div>
+      <div id="ann-admin-list"></div>
+    </div>
+    <div id="sec-a-tools" class="section">
+      <div class="card">
+        <div class="card-title">🛠 Tools</div>
+        <button class="btn btn-warn" onclick="undoScore()">↩ Undo Last Score Entry</button>
+        <button class="btn btn-warn" onclick="clearCycleScores()">🔄 Clear This Cycle's Scores</button>
+        <button class="btn btn-ghost" onclick="exportData()">📤 Export JSON Backup</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📄 Season Report</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Generate a printable/shareable season summary PDF with final standings, awards, and session history.</div>
+        <button class="btn btn-primary" onclick="generateSeasonPDF()">📄 Generate Season Summary PDF</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🔑 Change PIN</div>
+        <div class="alert alert-info" style="margin-bottom:10px;">PIN is never shown publicly. Only change it here.</div>
+        <input class="inp" type="password" id="pin1" placeholder="New PIN (min 4 digits)">
+        <input class="inp" type="password" id="pin2" placeholder="Confirm new PIN">
+        <button class="btn btn-primary" onclick="changePin()">Update PIN</button>
+        <div id="pin-msg" style="font-size:12px;margin-top:6px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--red2);">⚠️ Danger Zone</div>
+        <button class="btn btn-danger" onclick="hardReset()">Full Reset — Wipe All Data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="bnav" id="bottom-nav">
+  <button class="bnav-btn active" id="bnav-home" onclick="nav('home',this)"><span class="bi">🏠</span>Home</button>
+  <button class="bnav-btn" id="bnav-register" onclick="nav('register',this)" style="display:none;"><span class="bi">📋</span>Register</button>
+  <button class="bnav-btn" id="bnav-courts" onclick="nav('courts',this)" style="display:none;"><span class="bi">🏟️</span>Courts</button>
+  <button class="bnav-btn" id="bnav-scores" onclick="nav('scores',this)" style="display:none;"><span class="bi">✏️</span>Scores</button>
+  <button class="bnav-btn" id="bnav-standings" onclick="nav('standings',this)" style="display:none;"><span class="bi">🏆</span>Standings</button>
+  <button class="bnav-btn" id="bnav-schedule" onclick="nav('schedule',this)" style="display:none;"><span class="bi">📅</span>Schedule</button>
+  <button class="bnav-btn" id="bnav-admin" onclick="nav('admin',this)"><span class="bi">⚙️</span>Admin</button>
+</nav>
+
+<div class="modal-ov" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal"><h3 id="modal-title"></h3><div id="modal-body"></div>
+    <button class="btn btn-ghost" style="margin-top:10px;" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════
+const SB='https://bwepvxelvwgwxrnaglrx.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZXB2eGVsdndnd3hybmFnbHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNjY2MDAsImV4cCI6MjA5MDc0MjYwMH0.goOjPH3LVeuXDdIHeBvtfP9atnxmc1DYSFWmct4iadk';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+
+async function sbG(t,f=''){const r=await fetch(`${SB}/rest/v1/${t}?${f}&order=created_at.asc`,{headers:H});return r.json();}
+async function sbP(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});return r.json();}
+async function sbU(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});return r.json();}
+async function sbD(t,id){await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});}
+async function sbUps(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});return r.json();}
+async function getKV(k){try{const r=await sbG('app_state',`key=eq.${k}`);return(r&&r[0])?JSON.parse(r[0].value):null;}catch(e){return null;}}
+async function setKV(k,v){await sbUps('app_state',{key:k,value:JSON.stringify(v)});}
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+const DATES=['Apr 7','Apr 14','Apr 21','Apr 28','May 5','May 12','May 19','May 26'];
+const FD=[new Date('2026-04-07T20:15:00'),new Date('2026-04-14T20:15:00'),new Date('2026-04-21T20:15:00'),new Date('2026-04-28T20:15:00'),new Date('2026-05-05T20:15:00'),new Date('2026-05-12T20:15:00'),new Date('2026-05-19T20:15:00'),new Date('2026-05-26T20:15:00')];
+const NC=6,NCYC=4,NG=3;
+let S={players:[],sessions:[],current:null,announcements:[],lastUndo:null,votes:{},rsvp:{},qaQuestions:[]};
+let adminUnlocked=false;
+let courtView='gym';
+let regData={};
+
+// ══════════════════════════════════════════════
+// LOAD
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// INVITE CODE SYSTEM
+// ══════════════════════════════════════════════
+let inviteGateActive = true;
+let userRegistered = false;
+const DEFAULT_INVITE = 'MAPLE2026';
+
+async function initInviteGate(){
+  const stored = localStorage.getItem('dcbc-invite');
+  if(stored){
+    inviteGateActive = false;
+    document.getElementById('invite-gate').classList.add('hidden');
+    checkRegistrationStatus();
+  }
+}
+
+async function submitInviteCode(){
+  const code = document.getElementById('invite-code-input').value.trim().toUpperCase();
+  const stored = await getKV('invite_code') || DEFAULT_INVITE;
+  if(code === stored){
+    localStorage.setItem('dcbc-invite', code);
+    inviteGateActive = false;
+    document.getElementById('invite-gate').classList.add('hidden');
+    checkRegistrationStatus();
+    renderAll();
+  }else{
+    document.getElementById('invite-err').textContent = '❌ Incorrect code';
+    setTimeout(() => {
+      document.getElementById('invite-err').textContent = '';
+    }, 2000);
+  }
+}
+
+function checkRegistrationStatus(){
+  const email = localStorage.getItem('dcbc-email');
+  if(email){
+    const me=S.players.find(p=>p.email.toLowerCase()===email.toLowerCase());
+    userRegistered = !!(me && me.approved);
+  } else {
+    userRegistered = false;
+  }
+  updateNavVisibility();
+}
+
+function updateNavVisibility(){
+  const register = document.getElementById('bnav-register');
+  const courts = document.getElementById('bnav-courts');
+  const scores = document.getElementById('bnav-scores');
+  const standings = document.getElementById('bnav-standings');
+  const schedule = document.getElementById('bnav-schedule');
+  const admin = document.getElementById('bnav-admin');
+  // Admin tab is ALWAYS visible — tapping it prompts for PIN if not unlocked
+  admin.style.display = 'flex';
+  if(adminUnlocked){
+    admin.style.color = 'var(--yellow2)';
+    admin.querySelector('.bi').textContent = '⚙️';
+  } else {
+    admin.style.color = '';
+  }
+  if(adminUnlocked||userRegistered){
+    // Admin or approved registered user — show all tabs (hide Register for registered users)
+    register.style.display = (userRegistered&&!adminUnlocked)?'none':'flex';
+    courts.style.display = 'flex';
+    scores.style.display = 'flex';
+    standings.style.display = 'flex';
+    schedule.style.display = 'flex';
+  }else{
+    // First-time / unregistered user — ONLY show Register
+    register.style.display = 'flex';
+    courts.style.display = 'none';
+    scores.style.display = 'none';
+    standings.style.display = 'none';
+    schedule.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════
+// RSVP SYSTEM
+// ══════════════════════════════════════════════
+async function submitRSVP(coming){
+  if(!S.current) return toast('No active session', 'warn');
+  const email = localStorage.getItem('dcbc-email');
+  if(!email) return toast('Not registered', 'warn');
+  const rsvpKey = `dcbc-rsvp-${S.current.number}`;
+  if(localStorage.getItem(rsvpKey)) return toast('Already RSVPd this session', 'warn');
+  
+  const rsvpData = await getKV(`rsvp_session_${S.current.number}`) || {};
+  rsvpData[email] = coming ? 'coming' : 'notcoming';
+  await setKV(`rsvp_session_${S.current.number}`, rsvpData);
+  localStorage.setItem(rsvpKey, 'true');
+  
+  S.rsvp = { ...rsvpData };
+  renderRSVP();
+  toast(coming ? 'You are coming! 🎉' : 'Noted - see you next time!', 'success');
+}
+
+function renderRSVP(){
+  const el = document.getElementById('sec-vote');
+  if(!el) return;
+  if(!S.current){
+    el.innerHTML = '<div class="alert alert-warn">No active session</div>';
+    return;
+  }
+  
+  const rsvpKey = `dcbc-rsvp-${S.current.number}`;
+  const hasRSVPd = localStorage.getItem(rsvpKey);
+  const rsvpData = S.rsvp || {};
+  
+  const coming = Object.values(rsvpData).filter(v => v === 'coming').length;
+  const notComing = Object.values(rsvpData).filter(v => v === 'notcoming').length;
+  const total = S.players.length;
+  const notResponded = total - Object.keys(rsvpData).length;
+
+  let html = `<div class="alert alert-info">📋 RSVP for Session ${S.current.number}</div>`;
+  html += `<div class="card"><div class="card-title">Attendance Confirmation</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;text-align:center;">
+      <div><div style="font-size:20px;font-weight:800;color:var(--green2);">${coming}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Coming</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--red2);">${notComing}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Not Coming</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--muted);">${notResponded}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">No Reply</div></div>
+    </div>`;
+  
+  if(!hasRSVPd){
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button class="btn btn-success" onclick="submitRSVP(true)" style="margin:0;">✅ I'm Coming</button>
+      <button class="btn btn-ghost" onclick="submitRSVP(false)" style="margin:0;">❌ Not Coming</button>
+    </div>`;
+  }else{
+    const email = localStorage.getItem('dcbc-email');
+    const myRsvp = rsvpData[email];
+    html += `<div class="alert alert-success" style="text-align:center;">
+      ${myRsvp === 'coming' ? '✅ You confirmed - See you there!' : '❌ Noted - Sit this one out'}
+    </div>`;
+  }
+  html += `</div>`;
+  
+  if(adminUnlocked){
+    html += `<div class="card"><div class="card-title">📋 RSVP Status</div>`;
+    S.players.forEach(p => {
+      const status = rsvpData[p.email];
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;">${esc(p.name)}</div>
+        <span class="tag ${status === 'coming' ? 'tg-green' : status === 'notcoming' ? 'tg-red' : 'tg-gray'}">
+          ${status === 'coming' ? '✅ Coming' : status === 'notcoming' ? '❌ Not Coming' : '⏳ Not Responded'}
+        </span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  
+  el.innerHTML = html;
+}
+
+async function loadAll(){
+  try{
+    const[pl,an,cur,sess]=await Promise.all([sbG('players'),sbG('announcements','order=created_at.desc'),getKV('current_session'),getKV('completed_sessions')]);
+    const membershipOverrides=await getKV('membership_overrides')||{};
+    S.players=(pl||[]).map(p=>({id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:membershipOverrides[p.id]||p.membership_type||'regular',approved:p.approved===undefined?true:!!p.approved,registeredAt:p.registered_at||p.created_at||'',waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''}));
+    S.announcements=an||[];
+    S.current=cur||null;
+    S.sessions=sess||[];
+    if(S.current){S.votes=await getKV(`votes_session_${S.current.number}`)||{};S.rsvp=await getKV(`rsvp_session_${S.current.number}`)||{};}
+    S.qaQuestions=await getKV('qa_questions')||[];
+    return true;
+  }catch(e){return false;}
+}
+
+function startSync(){setInterval(async()=>{setSS('syncing');await loadAll();renderAll();setSS('ok');},3000);}
+function setSS(s){const d=document.getElementById('sdot'),l=document.getElementById('slbl');if(!d)return;d.className='sdot'+(s==='syncing'?' syncing':s==='err'?' err':'');l.textContent=s==='syncing'?'Syncing':s==='err'?'Offline':'Live';}
+
+// ══════════════════════════════════════════════
+// ROUTING
+// ══════════════════════════════════════════════
+function nav(page,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(el)el.classList.add('active');
+  else{const btn=document.getElementById('bnav-'+page);if(btn)btn.classList.add('active');}
+  renderAll();
+}
+function showSec(page,sec,el){
+  const par=document.getElementById('page-'+page)||document.getElementById('admin-panel');
+  par.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  par.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const se=document.getElementById('sec-'+sec);if(se)se.classList.add('active');
+  renderAll();
+}
+function setView(v,el){
+  courtView=v;
+  document.querySelectorAll('.vt-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('court-gym-view').style.display=v==='gym'?'block':'none';
+  document.getElementById('court-list-view').style.display=v==='list'?'block':'none';
+  renderCourts();
+}
+
+// ══════════════════════════════════════════════
+// ADMIN AUTH
+// ══════════════════════════════════════════════
+async function checkPin(){
+  const v=document.getElementById('pin-inp').value;
+  const stored=await getKV('admin_pin')||'2431270';
+  if(v===stored){
+    adminUnlocked=true;
+    document.getElementById('admin-lock').style.display='none';
+    document.getElementById('admin-panel').style.display='block';
+    document.getElementById('pin-inp').value='';
+    updateNavVisibility();
+    renderAll();
+    document.getElementById('page-courts').classList.add('admin-mode');
+  }else{
+    const e=document.getElementById('pin-err');
+    e.style.display='block';e.textContent='❌ Incorrect PIN';
+    document.getElementById('pin-inp').value='';
+    setTimeout(()=>e.style.display='none',2000);
+  }
+}
+function lockAdmin(){
+  adminUnlocked=false;
+  document.getElementById('admin-lock').style.display='block';
+  document.getElementById('admin-panel').style.display='none';
+  document.getElementById('page-courts').classList.remove('admin-mode');
+  renderAll();
+}
+async function changePin(){
+  const p1=document.getElementById('pin1').value,p2=document.getElementById('pin2').value;
+  const m=document.getElementById('pin-msg');
+  if(p1.length<4){m.style.color='var(--red2)';m.textContent='Min 4 digits';return;}
+  if(p1!==p2){m.style.color='var(--red2)';m.textContent='PINs do not match';return;}
+  await setKV('admin_pin',p1);
+  document.getElementById('pin1').value='';document.getElementById('pin2').value='';
+  m.style.color='var(--green2)';m.textContent='✓ PIN updated!';
+  setTimeout(()=>m.textContent='',2000);
+}
+
+// ══════════════════════════════════════════════
+// HOME
+// ══════════════════════════════════════════════
+function renderHome(){
+  const now=new Date();
+  let ni=FD.findIndex(d=>d>now);if(ni===-1)ni=7;
+  const nd=document.getElementById('next-date');
+  if(nd)nd.textContent=S.sessions.length>=8?'Season Complete! 🎉':`Session ${ni+1} — ${DATES[ni]}, 2026`;
+  
+  // Registration gate banner
+  const regBanner = document.querySelector('.reg-gate-banner');
+  if(!userRegistered){
+    if(!regBanner){
+      const banner = document.createElement('div');
+      banner.className = 'reg-gate-banner';
+      banner.textContent = '📋 Please register to access all features';
+      document.getElementById('page-home').insertBefore(banner, document.getElementById('page-home').firstChild);
+    }
+  }else if(regBanner){
+    regBanner.remove();
+  }
+  // Dynamic quick access buttons
+  const qab=document.getElementById('quick-access-btns');
+  if(qab){
+    if(adminUnlocked||userRegistered){
+      qab.innerHTML=`<button class="btn btn-ghost" style="margin:0;" onclick="nav('courts')">🏟️ Courts</button>
+        <button class="btn btn-ghost" style="margin:0;" onclick="nav('scores')">✏️ Scores</button>
+        <button class="btn btn-ghost" style="margin:0;" onclick="nav('standings')">🏆 Standings</button>
+        <button class="btn btn-ghost" style="margin:0;" onclick="nav('schedule')">📅 Schedule</button>`;
+    }else{
+      qab.innerHTML=`<button class="btn btn-primary" style="margin:0;grid-column:span 2;" onclick="nav('register')">📋 Register Now to Access All Features</button>`;
+    }
+  }
+  const cd=document.getElementById('countdown');
+  if(cd&&ni<8){const diff=FD[ni]-now;if(diff>0){const days=Math.floor(diff/86400000),hrs=Math.floor((diff%86400000)/3600000),mins=Math.floor((diff%3600000)/60000);cd.innerHTML=`<div class="cd-box"><div class="cd-num">${days}</div><div class="cd-lbl">Days</div></div><div class="cd-box"><div class="cd-num">${hrs}</div><div class="cd-lbl">Hours</div></div><div class="cd-box"><div class="cd-num">${mins}</div><div class="cd-lbl">Mins</div></div>`;}}
+  // Announcements
+  const ah=document.getElementById('ann-home');
+  if(ah)ah.innerHTML=S.announcements.length?S.announcements.slice(0,3).map(a=>`<div class="ann-card ann-${a.type}"><div class="ann-title">${esc(a.title)}</div><div class="ann-body">${esc(a.body)}</div><div class="ann-time">${new Date(a.created_at).toLocaleDateString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>`).join(''):'';
+  // Player of session
+  renderPOS('pos-home');
+  // Admin checklist
+  const acl=document.getElementById('admin-checklist-home');
+  if(acl&&adminUnlocked){
+    const paid=S.players.filter(p=>p.paid).length;
+    const waiver=S.players.filter(p=>p.waiverSigned).length;
+    const total=S.players.length;
+    const assigned=S.current?Object.values(S.current.assignments).flat().length:0;
+    const regPaidAmt=S.players.filter(p=>p.paid&&p.membershipType!=='spare').length*150;
+    const sparePaidCnt=S.players.filter(p=>p.paid&&p.membershipType==='spare').length;
+    acl.innerHTML=`<div class="card"><div class="card-title">✅ Admin Checklist</div>
+      <div class="checklist-item"><div class="chk-icon ${paid===total&&total>0?'chk-ok':'chk-warn'}">${paid===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Payments: <strong>${paid}/${total} paid</strong></div><span class="tag ${paid===total&&total>0?'tg-green':'tg-yellow'}">$${regPaidAmt}${sparePaidCnt>0?` +${sparePaidCnt}×spare`:''}</span></div>
+      <div class="checklist-item"><div class="chk-icon ${waiver===total&&total>0?'chk-ok':'chk-warn'}">${waiver===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Waivers: <strong>${waiver}/${total} signed</strong></div></div>
+      <div class="checklist-item"><div class="chk-icon ${S.current?'chk-ok':'chk-no'}">${S.current?'✓':'✗'}</div><div style="flex:1;font-size:13px;">Session: <strong>${S.current?'Active — '+S.current.date:'Not started'}</strong></div></div>
+      <div class="checklist-item" style="border:none;"><div class="chk-icon ${assigned>0?'chk-ok':'chk-no'}">${assigned>0?'✓':'✗'}</div><div style="flex:1;font-size:13px;">Court assignments: <strong>${assigned} players</strong></div></div>
+    </div>`;
+  }else if(acl)acl.innerHTML='';
+}
+
+function renderPOS(elId){
+  const el=document.getElementById(elId);if(!el||!S.sessions.length)return el&&(el.innerHTML='');
+  // Find player with most wins in last session
+  const last=S.sessions[S.sessions.length-1];
+  if(!last||!last.movements)return el.innerHTML='';
+  const wins={};
+  last.movements.forEach(m=>{Object.entries(m.wins||{}).forEach(([id,w])=>{wins[id]=(wins[id]||0)+w;});});
+  const best=Object.entries(wins).sort((a,b)=>b[1]-a[1])[0];
+  if(!best)return el.innerHTML='';
+  const p=S.players.find(x=>x.id===parseInt(best[0]));
+  if(!p)return el.innerHTML='';
+  el.innerHTML=`<div class="pos-banner"><div class="pos-crown">👑</div><div class="pos-title">Player of Session ${last.number}</div><div class="pos-name">${esc(p.name)}</div><div class="pos-stat">${best[1]} wins · Session ${last.number} — ${last.date}</div></div>`;
+}
+
+// ══════════════════════════════════════════════
+// SCHEDULE
+// ══════════════════════════════════════════════
+function renderSchedule(){
+  const el=document.getElementById('sched-list');if(!el)return;
+  const now=new Date();
+  el.innerHTML=DATES.map((d,i)=>{
+    const done=S.sessions.find(s=>s.number===i+1);
+    const act=S.current&&S.current.number===i+1;
+    const bg=done?'var(--green)':act?'var(--teal)':'var(--s3)';
+    return `<div class="sched-row">
+      <div style="width:30px;height:30px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${done?'✓':i+1}</div>
+      <div style="flex:1;"><div style="font-weight:800;font-size:14px;color:${done?'var(--green2)':act?'var(--teal2)':'var(--text)'}">Session ${i+1} — ${d}, 2026</div>
+        <div style="font-size:11px;color:var(--muted);">Tuesday · 8:15–10:15 PM</div></div>
+      <span class="tag ${done?'tg-green':act?'tg-teal':'tg-gray'}">${done?'Done':act?'Active':'—'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// PLAYERS
+// ══════════════════════════════════════════════
+async function addPlayer(){
+  const name=g('np-name').trim(),court=parseInt(g('np-court'));
+  const mtype=g('np-membership')||'regular';
+  if(!name){toast('Enter a name','warn');return;}
+  if(mtype==='regular'){
+    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+    if(regularCount>=24){toast('Regular slots full (24/24). Please choose Spare.','warn');return;}
+  }
+  if(S.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Player already exists','warn');return;}
+  // NOTE: membership_type column may not exist in DB — do NOT include it in INSERT
+  // We use KV store (membership_overrides) as the reliable source for membership type
+  let res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:true,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0,approved:true,no_show_count:0});
+  // If INSERT fails (e.g. approved/no_show_count columns missing), try minimal INSERT
+  if(!res||res.code||res.message||!Array.isArray(res)){
+    res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:false,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
+  }
+  if(!res||res.code||res.message){toast('Error adding player — check DB connection','error');console.error('addPlayer error:',res);return;}
+  // Store membership type in KV store (always reliable)
+  if(Array.isArray(res)&&res[0]){
+    const overrides=await getKV('membership_overrides')||{};
+    overrides[res[0].id]=mtype;
+    await setKV('membership_overrides',overrides);
+  }
+  document.getElementById('np-name').value='';
+  await loadAll();renderAll();toast(name+' added as '+mtype+'!','success');
+}
+async function removePlayer(id){if(!confirm('Remove this player?'))return;await sbD('players',id);await loadAll();renderAll();}
+async function togglePaid(id){const p=S.players.find(x=>x.id===id);if(!p)return;await sbU('players',id,{paid:!p.paid});await loadAll();renderAll();}
+async function setPlayerCourt(id,c){await sbU('players',id,{current_court:parseInt(c)});await loadAll();renderAll();}
+async function toggleMembership(id,type){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  if(type===p.membershipType)return; // no change
+  if(type==='regular'){
+    const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted&&x.id!==id).length;
+    if(regularCount>=24){toast('Regular slots full (24/24). Cannot switch to Regular.','warn');return;}
+  }
+  // Primary: store in KV override (works regardless of DB schema)
+  const overrides=await getKV('membership_overrides')||{};
+  overrides[id]=type;
+  await setKV('membership_overrides',overrides);
+  // Secondary: also try to update DB column (best-effort)
+  sbU('players',id,{membership_type:type}).catch(()=>{});
+  await loadAll();renderAll();
+  toast(`${p.name} changed to ${type==='spare'?'Spare':'Regular'}`,'success');
+}
+function openAdminNote(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  openModal('📝 Admin Note — '+esc(p.name),`
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Private note only visible to admin (e.g. "has knee injury", "may leave early")</div>
+    <textarea class="inp" id="admin-note-text" placeholder="Enter private note..." style="min-height:90px;">${esc(p.adminNote||'')}</textarea>
+    <button class="btn btn-primary" onclick="saveAdminNote(${id})">💾 Save Note</button>
+    ${p.adminNote?`<button class="btn btn-danger" style="margin-top:6px;" onclick="clearAdminNote(${id})">🗑 Clear Note</button>`:''}
+  `);
+}
+async function saveAdminNote(id){
+  const text=document.getElementById('admin-note-text')?.value?.trim()||'';
+  await sbU('players',id,{admin_note:text});
+  await loadAll();renderAll();closeModal();toast('Note saved!','success');
+}
+async function clearAdminNote(id){
+  await sbU('players',id,{admin_note:''});
+  await loadAll();renderAll();closeModal();toast('Note cleared','warn');
+}
+
+function renderAdminPlayers(){
+  const el=document.getElementById('a-pl-list');if(!el)return;
+  // Court distribution summary + Re-sort button (always visible)
+  const csEl=document.getElementById('a-pl-court-summary');
+  if(csEl&&S.players.length){
+    const courtCounts={};for(let c=1;c<=NC;c++)courtCounts[c]=S.players.filter(p=>p.currentCourt===c).length;
+    const hasGaps=Object.values(courtCounts).some((n,i,arr)=>i>0&&n>0&&arr[i-1]===0)||Object.values(courtCounts).some(n=>n>4);
+    csEl.innerHTML=`<div class="card" style="border-color:var(--teal);margin-bottom:12px;">
+      <div class="card-title">🏟️ Court Distribution</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px;">
+        ${[1,2,3,4,5,6].map(c=>{const n=courtCounts[c];const color=n===4?'var(--green2)':n===0?'var(--muted)':'var(--yellow2)';
+          return `<div style="text-align:center;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 4px;">
+            <div style="font-size:10px;color:var(--muted);font-weight:700;">C${c}</div>
+            <div style="font-size:18px;font-weight:800;color:${color};">${n}</div>
+            <div style="font-size:9px;color:${color};">${n}/4</div>
+          </div>`;}).join('')}
+      </div>
+      <button class="btn btn-warn" onclick="rebalancePlayerCourts()">🔄 Re-sort &amp; Rebalance All Courts</button>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;">Redistributes all players evenly (4 per court) by current court ranking</div>
+    </div>`;
+  }else if(csEl){csEl.innerHTML='';}
+  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">👤</div><div class="em">No players yet</div></div>';return;}
+  const regulars=S.players.filter(p=>p.membershipType!=='spare');
+  const spares=S.players.filter(p=>p.membershipType==='spare');
+  let html=`<div class="card"><div class="card-title">All Players — ${S.players.length} Total (${regulars.length} Regular · ${spares.length} Spare)</div>`;
+  // Sort by currentCourt ascending so C1 players always show first
+  const sortedPlayers=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
+  sortedPlayers.forEach((p,i)=>{
+    const noteIcon=p.adminNote?'📝':'📋';
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);">
+    <div class="pl-num">${i+1}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:800;font-size:13px;">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${p.waitlisted?'<span class="waitlist-badge">WAITLIST</span>':''}</div>
+      <div style="font-size:10px;color:var(--muted);">${esc(p.email)||'—'} · C${p.currentCourt} · ${p.seasonWins}W ${p.seasonLosses}L · Absent:${p.noShowCount}</div>
+      ${p.adminNote?`<div style="font-size:10px;color:var(--yellow2);margin-top:2px;">📝 ${esc(p.adminNote)}</div>`:''}
+    </div>
+    <button class="notes-btn" onclick="openAdminNote(${p.id})" title="Admin Notes">${noteIcon}</button>
+    <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;" onclick="togglePaid(${p.id})">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
+    <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px;" onchange="toggleMembership(${p.id},this.value)">
+      <option value="regular" ${p.membershipType!=='spare'?'selected':''}>Regular</option>
+      <option value="spare" ${p.membershipType==='spare'?'selected':''}>Spare</option>
+    </select>
+    <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px;" onchange="setPlayerCourt(${p.id},this.value)">
+      ${[1,2,3,4,5,6].map(c=>`<option value="${c}" ${p.currentCourt===c?'selected':''}>C${c}</option>`).join('')}
+    </select>
+    <button class="btn btn-danger btn-sm" onclick="removePlayer(${p.id})">✕</button>
+  </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════════════════
+// PAYMENTS
+// ══════════════════════════════════════════════
+
+function renderRegPlayers(){
+  const el=document.getElementById('sec-a-reg');if(!el)return;
+  const waitlisted=S.players.filter(p=>p.waiverSigned&&p.waitlisted);
+  const pending=S.players.filter(p=>p.waiverSigned&&!p.approved&&!p.waitlisted);
+  const approved=S.players.filter(p=>p.waiverSigned&&p.approved&&!p.waitlisted);
+  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+  const spareCount=S.players.filter(p=>p.membershipType==='spare').length;
+  let html=`<div class="card"><div class="card-title">📊 Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">${regularCount}/24</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Regular</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--yellow2);">${spareCount}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Spare</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--red2);">${pending.length}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Pending</div></div>
+      <div><div style="font-size:20px;font-weight:800;color:var(--teal);">${waitlisted.length}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Waitlist</div></div>
+    </div></div>`;
+  if(waitlisted.length){
+    html+=`<div class="card" style="border-color:var(--teal);"><div class="card-title" style="color:var(--teal2);">⏳ Waitlist (${waitlisted.length}) — Regular slots full</div>`;
+    html+=waitlisted.map((p,i)=>`<div style="padding:12px;border-bottom:1px solid var(--border);">
+      <div class="flex-between" style="margin-bottom:4px;">
+        <div style="font-weight:800;font-size:13px;">#${i+1} ${esc(p.name)}<span class="waitlist-badge">WAITLIST</span></div>
+        <div style="display:flex;gap:5px;">
+          ${regularCount<24?`<button class="btn btn-success btn-sm" onclick="promoteFromWaitlist(${p.id})" style="padding:4px 8px;">↑ Promote</button>`:'<span class="tag tg-gray">Slots Full</span>'}
+          <button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--teal2);">📧 ${esc(p.email)}</div>
+      <div style="font-size:11px;margin-top:2px;">📞 ${esc(p.phone)}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;">Registered: ${p.registeredAt?new Date(p.registeredAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Unknown'}</div>
+    </div>`).join('');
+    html+='</div>';
+  }
+  if(pending.length){
+    html+=`<div class="card" style="border-color:var(--yellow);"><div class="card-title" style="color:var(--yellow2);">⏳ Pending Approval (${pending.length})</div>`;
+    html+=pending.map(p=>regPlayerCard(p,true)).join('');
+    html+='</div>';
+  }
+  if(approved.length){
+    html+=`<div class="card"><div class="card-title">✅ Approved (${approved.length})</div>`;
+    html+=approved.map(p=>regPlayerCard(p,false)).join('');
+    html+='</div>';
+  }
+  if(!pending.length&&!approved.length&&!waitlisted.length)html='<div class="empty-state"><div class="ei">📋</div><div class="em">No registered players yet — players register through the Register tab</div></div>';
+  el.innerHTML=html;
+  // Update pending badge on the Registered tab
+  const badge=document.getElementById('reg-pending-badge');
+  if(badge){
+    if(pending.length>0){badge.textContent=pending.length;badge.style.display='inline';}
+    else{badge.style.display='none';}
+  }
+}
+async function promoteFromWaitlist(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted).length;
+  if(regularCount>=24){toast('Still no open regular slots (24/24)','warn');return;}
+  if(!confirm(`Promote ${p.name} off the waitlist to Regular member?`))return;
+  await sbU('players',id,{waitlisted:false,approved:true});
+  await loadAll();renderAll();toast(p.name+' promoted from waitlist!','success');
+}
+function regPlayerCard(p,showApprove){
+  const isSpare=p.membershipType==='spare';
+  const regDate=p.registeredAt?new Date(p.registeredAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Unknown';
+  return `<div style="padding:12px;border-bottom:1px solid var(--border);">
+    <div class="flex-between" style="margin-bottom:6px;">
+      <div style="font-weight:800;font-size:13px;">${esc(p.name)}${isSpare?'<span class="spare-badge">SPARE</span>':''}</div>
+      <div style="display:flex;gap:5px;">
+        <span class="tag ${p.paid?'tg-green':'tg-yellow'}">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
+        ${showApprove?`<button class="btn btn-success btn-sm" onclick="approvePlayer(${p.id})" style="padding:4px 8px;">✓ Approve</button><button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>`:''}
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--teal2);margin-bottom:4px;">📧 ${esc(p.email)}</div>
+    <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div>📞 ${esc(p.phone)}</div><div>🏸 Court ${p.currentCourt}</div>
+    </div>
+    <div style="font-size:11px;margin-top:4px;">🚨 ${esc(p.emergency)}</div>
+    ${p.medical?`<div style="font-size:11px;margin-top:2px;color:var(--yellow2);">⚕️ ${esc(p.medical)}</div>`:''}
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;">Registered: ${regDate} · Sig: "${esc((p.sig||'').substring(0,20))}"</div>
+  </div>`;
+}
+
+function renderPayments(){
+  const sum=document.getElementById('pay-summary'),list=document.getElementById('pay-list');if(!sum||!list)return;
+  const regulars=S.players.filter(p=>p.membershipType!=='spare');
+  const spares=S.players.filter(p=>p.membershipType==='spare');
+  const regPaid=regulars.filter(p=>p.paid).length;
+  const sparePaid=spares.filter(p=>p.paid).length;
+  sum.innerHTML=`
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">Regular Members (${regulars.length}/24)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+        <div><div style="font-size:20px;font-weight:800;color:var(--green2);">${regPaid}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Paid</div></div>
+        <div><div style="font-size:20px;font-weight:800;color:var(--red2);">${regulars.length-regPaid}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Unpaid</div></div>
+        <div><div style="font-size:20px;font-weight:800;color:var(--teal2);">$${regPaid*150}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Collected</div></div>
+      </div>
+      <div style="background:var(--s2);border-radius:8px;height:5px;margin-top:8px;overflow:hidden;"><div style="height:100%;background:var(--green);width:${regulars.length>0?Math.round(regPaid/regulars.length*100):0}%;border-radius:8px;"></div></div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--yellow2);margin-bottom:8px;">Spare Players (${spares.length})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
+        <div><div style="font-size:20px;font-weight:800;color:var(--green2);">${sparePaid}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Session Paid</div></div>
+        <div><div style="font-size:20px;font-weight:800;color:var(--yellow2);">${spares.length-sparePaid}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Unpaid</div></div>
+      </div>
+    </div>`;
+  // Regular players first, then spares
+  const makeRow=(p)=>{
+    const isSpare=p.membershipType==='spare';
+    return `<div class="pay-row">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;">${esc(p.name)}${isSpare?'<span class="spare-badge" style="margin-left:6px;">SPARE</span>':''}</div>
+        <div style="font-size:11px;color:${p.paid?'var(--green2)':'var(--yellow2)'};">
+          ${p.paid?(isSpare?'✅ $24.50 session fee paid':'✅ Paid $150'):(isSpare?'⏳ $24.50 session fee pending':'⏳ $150 e-transfer pending')}
+        </div>
+      </div>
+      <button class="btn ${p.paid?'btn-ghost':'btn-success'} btn-sm" onclick="togglePaid(${p.id})">${p.paid?'Undo':'Mark Paid'}</button>
+    </div>`;
+  };
+  list.innerHTML=
+    (regulars.length?`<div style="font-size:10px;color:var(--muted);font-weight:700;padding:8px 0 4px;letter-spacing:1px;text-transform:uppercase;">Regular Members</div>`+regulars.map(makeRow).join(''):'')
+    +(spares.length?`<div style="font-size:10px;color:var(--yellow2);font-weight:700;padding:12px 0 4px;letter-spacing:1px;text-transform:uppercase;">Spare Players</div>`+spares.map(makeRow).join(''):'');
+}
+
+// ══════════════════════════════════════════════
+// ANNOUNCEMENTS
+// ══════════════════════════════════════════════
+async function postAnn(){
+  const type=g('ann-type'),title=g('ann-title').trim(),body=g('ann-body').trim();
+  if(!title||!body){toast('Fill title and message','warn');return;}
+  await sbP('announcements',{type,title,body});
+  document.getElementById('ann-title').value='';document.getElementById('ann-body').value='';
+  await loadAll();renderAll();toast('Posted!','success');
+}
+async function deleteAnn(id){await sbD('announcements',id);await loadAll();renderAll();}
+function renderAnnouncementsAdmin(){
+  const el=document.getElementById('ann-admin-list');if(!el)return;
+  if(!S.announcements.length){el.innerHTML='<div class="empty-state"><div class="ei">📣</div><div class="em">No announcements</div></div>';return;}
+  el.innerHTML=S.announcements.map(a=>`<div class="ann-card ann-${a.type}">
+    <div class="flex-between"><div class="ann-title">${esc(a.title)}</div><button class="btn btn-danger btn-sm" onclick="deleteAnn(${a.id})">✕</button></div>
+    <div class="ann-body">${esc(a.body)}</div></div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+// SESSION
+// ══════════════════════════════════════════════
+async function startSession(){
+  if(S.current)return toast('Session already active','warn');
+  const n=S.sessions.length+1;if(n>8)return toast('All 8 done!','warn');
+  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,assignments:autoAssign(),scores:{},movements:[],completed:false};
+  await setKV('current_session',sess);await loadAll();renderAll();toast('Session '+n+' started!','success');
+}
+function autoAssign(){
+  const a={};for(let c=1;c<=NC;c++)a[c]=[];
+  const sorted=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
+  sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);a[c].push(p.id);});
+  return a;
+}
+async function nextCycle(){
+  if(!S.current)return toast('No active session','warn');
+  if(S.current.cycle>=NCYC)return toast('All cycles done','warn');
+  const missing=[];
+  for(let c=1;c<=NC;c++){
+    const courtPlayers=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id)).length;
+    if(courtPlayers<2) continue; // skip courts with <2 players (no games possible)
+    const numGames=courtPlayers===3?3:NG; // 3-player RR has 3 games too
+    for(let g=1;g<=numGames;g++)if(!S.current.scores[`c${c}_y${S.current.cycle}_g${g}`])missing.push(`C${c}G${g}`);
+  }
+  if(missing.length&&!confirm(`Missing ${missing.length} scores. Proceed?`))return;
+  await applyRotation();S.current.cycle++;
+  await setKV('current_session',S.current);await loadAll();renderAll();toast('Cycle '+S.current.cycle+'!','success');
+}
+async function applyRotation(){
+  const cy=S.current.cycle,a=S.current.assignments,wins={},pts={},ptFor={},ptAgainst={},gamesPlayedCycle={};
+  S.players.forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;gamesPlayedCycle[p.id]=0;});
+  for(let c=1;c<=NC;c++)for(let g=1;g<=NG;g++){
+    const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
+    // Handle both doubles (a2/b2 present) and singles (a2/b2 null)
+    const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
+    const side_b=[sc.b1,sc.b2].filter(x=>x!=null);
+    if(sc.w==='A'){side_a.forEach(id=>{wins[id]=(wins[id]||0)+1;});}
+    else if(sc.w==='B'){side_b.forEach(id=>{wins[id]=(wins[id]||0)+1;});}
+    side_a.forEach(id=>{pts[id]=(pts[id]||0)+sc.sA;ptFor[id]=(ptFor[id]||0)+sc.sA;ptAgainst[id]=(ptAgainst[id]||0)+sc.sB;gamesPlayedCycle[id]=(gamesPlayedCycle[id]||0)+1;});
+    side_b.forEach(id=>{pts[id]=(pts[id]||0)+sc.sB;ptFor[id]=(ptFor[id]||0)+sc.sB;ptAgainst[id]=(ptAgainst[id]||0)+sc.sA;gamesPlayedCycle[id]=(gamesPlayedCycle[id]||0)+1;});
+  }
+  const mv={},na={};for(let c=1;c<=NC;c++)na[c]=[];
+  for(let c=1;c<=NC;c++){
+    const pids=a[c]||[];if(pids.length<2){pids.forEach(id=>mv[id]='stay');continue;}
+    const sorted=[...pids].sort((a,b)=>{
+      const ptDiff_a = ptFor[a]-ptAgainst[a];
+      const ptDiff_b = ptFor[b]-ptAgainst[b];
+      const ptCmp = pts[b]-pts[a];
+      if(ptCmp !== 0) return ptCmp;
+      if(ptDiff_a !== ptDiff_b) return ptDiff_b - ptDiff_a;
+      return Math.random() - 0.5;
+    });
+    sorted.forEach((id,i)=>{if(i===0&&c>1)mv[id]='up';else if(i===sorted.length-1&&c<NC)mv[id]='down';else mv[id]='stay';});
+  }
+  Object.entries(mv).forEach(([id,m])=>{
+    const pid=parseInt(id);let from=null;
+    for(let c=1;c<=NC;c++)if((a[c]||[]).includes(pid)){from=c;break;}
+    if(from===null)return;
+    let to=from;if(m==='up')to=Math.max(1,from-1);if(m==='down')to=Math.min(NC,from+1);
+    na[to].push(pid);
+  });
+  for(let c=1;c<=NC;c++)while(na[c].length>4){const ov=na[c].pop();const t=c<NC?c+1:c-1;na[t].unshift(ov);}
+  S.current.assignments=na;
+  S.current.movements.push({cycle:cy,mv,wins:{...wins},pts:{...pts}});
+  // Update DB with actual games played this cycle per player
+  const rotationStatUpdates=[];
+  Object.entries(wins).forEach(([id,w])=>{
+    const pid=parseInt(id);
+    const p=S.players.find(x=>x.id===pid);
+    if(!p)return;
+    const played=gamesPlayedCycle[pid]||0;
+    if(played===0)return; // player had no games this cycle (absent)
+    rotationStatUpdates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
+  });
+  if(rotationStatUpdates.length) await Promise.all(rotationStatUpdates);
+}
+async function endSession(){
+  if(!S.current)return toast('No active session','warn');
+  if(!confirm('End session and save?'))return;
+  // ── Process current cycle's scores (applyRotation only runs on nextCycle, so the last cycle's W/L would otherwise be lost) ──
+  const cy=S.current.cycle;
+  const finalWins={},finalGamesPlayed={};
+  S.players.forEach(p=>{finalWins[p.id]=0;finalGamesPlayed[p.id]=0;});
+  for(let c=1;c<=NC;c++)for(let g=1;g<=NG;g++){
+    const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
+    const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
+    const side_b=[sc.b1,sc.b2].filter(x=>x!=null);
+    if(sc.w==='A') side_a.forEach(id=>{finalWins[id]=(finalWins[id]||0)+1;});
+    else if(sc.w==='B') side_b.forEach(id=>{finalWins[id]=(finalWins[id]||0)+1;});
+    side_a.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;});
+    side_b.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;});
+  }
+  // Apply last cycle's W/L to season stats
+  const statUpdates=[];
+  Object.entries(finalWins).forEach(([id,w])=>{
+    const pid=parseInt(id);
+    const p=S.players.find(x=>x.id===pid);
+    if(!p)return;
+    const played=finalGamesPlayed[pid]||0;
+    if(played===0)return;
+    statUpdates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
+  });
+  if(statUpdates.length) await Promise.all(statUpdates);
+  // ── Process attendance — determine absent players FIRST ──
+  const att=S.current.attendance||{};
+  const absentIds=new Set();
+  const assignedIds=new Set();
+  for(let c=1;c<=NC;c++)(S.current.assignments[c]||[]).forEach(id=>assignedIds.add(id));
+  assignedIds.forEach(id=>{
+    if(att[id]==='absent') absentIds.add(id);
+  });
+  // ── Update court positions (skip absent players — they get demoted separately) ──
+  const courtUpdates=[];
+  for(let c=1;c<=NC;c++)(S.current.assignments[c]||[]).forEach(id=>{
+    if(absentIds.has(id)) return; // skip — handled below with demotion
+    const p=S.players.find(x=>x.id===id);
+    if(p){const hc=c<p.highestCourt?c:p.highestCourt;courtUpdates.push(sbU('players',p.id,{current_court:c,highest_court:hc}));}
+  });
+  if(courtUpdates.length) await Promise.all(courtUpdates);
+  // ── Demote absent players (runs AFTER court updates to avoid race condition) ──
+  const demotionUpdates=[];
+  absentIds.forEach(id=>{
+    const p=S.players.find(x=>x.id===id);
+    if(p){
+      const newCount=(p.noShowCount||0)+1;
+      const demotedCourt=Math.min(NC, (p.currentCourt||1)+1);
+      demotionUpdates.push(sbU('players',id,{no_show_count:newCount, current_court:demotedCourt}));
+      toast(`⚠️ ${p.name} absent — court moved C${p.currentCourt}→C${demotedCourt} next session`,'warn');
+    }
+  });
+  if(demotionUpdates.length) await Promise.all(demotionUpdates);
+  // ── Save session record ──
+  S.current.completed=true;
+  // Store last cycle movement data
+  S.current.movements.push({cycle:cy,wins:{...finalWins}});
+  await setKV('completed_sessions',[...S.sessions,JSON.parse(JSON.stringify(S.current))]);
+  await setKV('current_session',null);
+  await loadAll();renderAll();toast('Session saved! 🏸','success');
+}
+async function cancelSession(){if(!confirm('Cancel session? All scores lost.'))return;await setKV('current_session',null);await loadAll();renderAll();}
+
+// ── Cascade fill: when a player is absent, promote top player from court below ──
+async function cascadeFillCourt(fromCourt){
+  if(!S.current)return toast('No active session','warn');
+  const a=S.current.assignments;
+  const hasCourt=a[fromCourt]&&a[fromCourt].length>0;
+  if(!hasCourt)return toast(`Court ${fromCourt} has no players to promote from`,'warn');
+  // Find the first court above that needs a player
+  let targetCourt=fromCourt-1;
+  while(targetCourt>=1&&(a[targetCourt]||[]).length>=4)targetCourt--;
+  if(targetCourt<1)return toast('All courts above are full (4/4)','warn');
+  // Take first player from fromCourt (highest-ranked based on position in array)
+  const pid=a[fromCourt][0];
+  a[fromCourt]=a[fromCourt].slice(1);
+  if(!a[targetCourt])a[targetCourt]=[];
+  a[targetCourt].unshift(pid); // promoted player goes to top of target court (position 1)
+  const p=S.players.find(x=>x.id===pid);
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  toast(`${p?p.name:'Player'} promoted from Court ${fromCourt} → Court ${targetCourt}`,'success');
+}
+async function rebalancePlayerCourts(){
+  // Works with or without an active session — updates DB current_court values directly
+  if(!confirm('Re-sort all courts? Players will be redistributed 4-per-court based on their current court ranking.'))return;
+  const sorted=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
+  const updates=[];
+  sorted.forEach((p,i)=>{
+    const newCourt=Math.min(Math.floor(i/4)+1,NC);
+    if(newCourt!==p.currentCourt){
+      updates.push(sbU('players',p.id,{current_court:newCourt}));
+    }
+  });
+  if(updates.length)await Promise.all(updates);
+  // Also update active session assignments if one exists
+  if(S.current){
+    const na={};for(let c=1;c<=NC;c++)na[c]=[];
+    sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);na[c].push(p.id);});
+    S.current.assignments=na;
+    await setKV('current_session',S.current);
+  }
+  await loadAll();renderAll();
+  toast(`Courts re-sorted — ${sorted.length} players across ${Math.ceil(sorted.length/4)} courts`,'success');
+}
+async function rebalanceCourts(){
+  if(!S.current)return toast('No active session','warn');
+  if(!confirm('Re-sort all courts? Players will be redistributed 4-per-court in order of their court ranking. This is best used after removing an absent player.'))return;
+  const a=S.current.assignments;
+  // Collect all currently assigned player IDs (deduplicated)
+  let allPids=[];
+  for(let c=1;c<=NC;c++)allPids.push(...(a[c]||[]));
+  allPids=[...new Set(allPids.filter(Boolean))];
+  // Resolve to player objects and sort by currentCourt ascending
+  const sorted=allPids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean).sort((x,y)=>x.currentCourt-y.currentCourt);
+  // Redistribute evenly: 4 per court, court 1 first
+  const na={};for(let c=1;c<=NC;c++)na[c]=[];
+  sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);na[c].push(p.id);});
+  S.current.assignments=na;
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  const total=sorted.length;
+  const courtsUsed=Math.ceil(total/4);
+  toast(`Courts re-sorted — ${total} players across ${courtsUsed} courts`,'success');
+}
+async function removePlayerFromCourtNow(playerId,court){
+  if(!S.current)return;
+  const a=S.current.assignments;
+  if(a[court])a[court]=a[court].filter(id=>id!==playerId);
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  const p=S.players.find(x=>x.id===playerId);
+  toast(`${p?p.name:'Player'} removed from Court ${court} — use Cascade Fill or Assign to redistribute`,'warn');
+}
+function renderSessionAdmin(){
+  const el=document.getElementById('sess-ui');if(!el)return;
+  if(S.current){
+    el.innerHTML=`<div class="alert alert-success">✅ Session ${S.current.number} — ${S.current.date} · Cycle ${S.current.cycle}/${NCYC}</div>
+    <div class="card"><div class="card-title">Controls</div>
+      <button class="btn btn-primary" onclick="nextCycle()">⏭ Next Cycle (Rotate)</button>
+      <button class="btn btn-success" onclick="endSession()">✅ End & Save Session</button>
+      <button class="btn btn-danger" onclick="cancelSession()">✕ Cancel Session</button>
+    </div>
+    <div class="card"><div class="card-title">⏰ Late Arrivals</div>
+      <div style="margin-bottom:10px;">
+        <select class="inp" id="late-player-sel" style="margin-bottom:6px;">
+          <option value="">— Select Player —</option>
+          ${S.players.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" onclick="markPlayerLate()">Mark Late</button>
+      </div>
+      <div>${(S.current.latePlayers||[]).map(lp=>{
+        const p=S.players.find(x=>x.id===lp.playerId);
+        return `<div style="padding:6px;background:var(--s3);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+          <span>⏰ ${p?esc(p.name):'Unknown'} (was C${lp.originalCourt})</span>
+        </div>`;
+      }).join('')}</div>
+    </div>
+    <div class="card"><div class="card-title">🚨 Missing Player — Cascade Fill</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">If a player doesn't show up, remove them from their court then cascade-fill from the court below. Last courts with 2–3 players will play singles.</div>
+      <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Step 1 — Remove absent player from court:</div>
+      <select class="inp" id="absent-player-sel" style="margin-bottom:6px;"><option value="">— Select absent player —</option>${S.players.map(p=>`<option value="${p.id}|${p.currentCourt}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}</select>
+      <button class="btn btn-danger" onclick="handleAbsentPlayer()">🚫 Remove from Court</button>
+      <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin:10px 0 6px;">Step 2 — Cascade fill short courts:</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        ${[2,3,4,5,6].map(c=>`<button class="btn btn-warn btn-sm" style="width:100%;margin:0;font-size:11px;" onclick="cascadeFillCourt(${c})">↑ Fill from C${c}</button>`).join('')}
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted);">Current court sizes: ${[1,2,3,4,5,6].map(c=>`C${c}: ${(S.current.assignments[c]||[]).length}`).join(' · ')}</div>
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+        <div style="font-size:11px;font-weight:800;color:var(--yellow2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Step 3 — One-click court re-sort (optional):</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">After removing a player, click below to automatically re-pack all players into clean courts of 4 (sorted by ranking). Courts with leftover players stay as singles.</div>
+        <button class="btn btn-warn" onclick="rebalanceCourts()" style="margin-top:0;">🔄 Re-sort &amp; Rebalance All Courts</button>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">🪶 Bird Distribution</div>
+      <div>${[1,2,3,4,5,6].map(c=>`
+        <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;">
+          <label style="width:120px;font-size:12px;">Court ${c}:</label>
+          <input type="number" class="inp" id="birds_${c}" min="0" value="0" style="width:60px;padding:4px;">
+          <span style="font-size:11px;color:var(--muted);">remaining</span>
+        </div>
+      `).join('')}
+      </div>
+      <button class="btn btn-primary" onclick="distributeBirds()" style="margin-top:10px;width:100%;">🪶 Distribute Birds</button>
+    </div>
+    <div class="card"><div class="card-title">✅ Attendance Marking</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Mark who actually showed up today. An unexcused absence moves the player one court down at the start of next session.</div>
+      <div id="attendance-list">${renderAttendanceList()}</div>
+      <button class="btn btn-success" onclick="saveAttendance()" style="margin-top:10px;">💾 Save Attendance</button>
+    </div>
+    <div class="card"><div class="card-title">Dates</div>${renderDatesList()}</div>`;
+  }else{
+    const n=S.sessions.length+1;
+    el.innerHTML=`<div class="alert alert-info">Next: Session ${n} — ${DATES[n-1]||'Season done'}</div>
+    <div class="card"><div class="card-title">Dates</div>${renderDatesList()}</div>
+    <button class="btn btn-primary" onclick="startSession()" ${n>8?'disabled':''}>🏸 Start Session ${n}</button>`;
+  }
+}
+function renderDatesList(){
+  return DATES.map((d,i)=>{
+    const done=S.sessions.find(s=>s.number===i+1),act=S.current&&S.current.number===i+1;
+    return `<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border);">
+      <div><div style="font-size:13px;font-weight:700;">Session ${i+1} — ${d}</div><div style="font-size:10px;color:var(--muted);">8:15–10:15 PM</div></div>
+      <span class="tag ${done?'tg-green':act?'tg-teal':''}">${done?'✓ Done':act?'● Active':'—'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// ASSIGN
+// ══════════════════════════════════════════════
+function renderAssignUI(){
+  const el=document.getElementById('assign-ui');if(!el)return;
+  // Render the Re-sort button in its dedicated slot
+  const rbEl=document.getElementById('assign-rebalance-btn');
+  if(rbEl){
+    if(S.current){rbEl.innerHTML=`<button class="btn btn-warn" style="margin-bottom:10px;" onclick="rebalanceCourts()">🔄 Re-sort &amp; Rebalance All Courts</button>`;}
+    else{rbEl.innerHTML=`<button class="btn btn-warn" style="margin-bottom:10px;" onclick="rebalancePlayerCourts()">🔄 Re-sort &amp; Rebalance All Courts</button>`;}
+  }
+  if(!S.current){el.innerHTML='<div class="alert alert-warn">Start a session first to drag-and-drop players between courts.</div>';return;}
+  const a=S.current.assignments;let html='';
+  // Count courts with <4 players
+  const underFull=[];
+  for(let c=1;c<=NC;c++){if((a[c]||[]).length<4)underFull.push(c);}
+  if(underFull.length>0){
+    html+=`<div class="alert alert-error" style="margin-bottom:12px;">⚠️ Court${underFull.length>1?'s':''} ${underFull.map(c=>'C'+c).join(', ')} ${underFull.length>1?'are':'is'} missing players — each court needs 4. Drag players between courts to fix.</div>`;
+  }
+  // Unassigned players
+  const assignedSet=new Set();
+  for(let c=1;c<=NC;c++)(a[c]||[]).forEach(id=>assignedSet.add(id));
+  const unassigned=S.players.filter(p=>!assignedSet.has(p.id));
+  if(unassigned.length){
+    html+=`<div class="dnd-court" data-court="0" ondragover="dndOver(event)" ondrop="dndDrop(event,0)" ondragleave="dndLeave(event)">
+      <div class="dnd-court-hdr"><span class="dnd-court-title" style="color:var(--yellow2);">UNASSIGNED</span><span class="dnd-court-cnt" style="background:rgba(243,156,18,0.15);color:var(--yellow2);">${unassigned.length}</span></div>
+      <div class="dnd-slots">${unassigned.map(p=>`<div class="dnd-player" draggable="true" data-pid="${p.id}" ondragstart="dndStart(event,${p.id})">${esc(p.name)}</div>`).join('')}</div>
+    </div>`;
+  }
+  for(let c=1;c<=NC;c++){
+    const pids=(a[c]||[]);
+    const players=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+    const cnt=players.length;
+    const warn=cnt<4;
+    const cntColor=cnt===4?'var(--green2)':cnt===0?'var(--muted)':'var(--yellow2)';
+    html+=`<div class="dnd-court" data-court="${c}" ondragover="dndOver(event)" ondrop="dndDrop(event,${c})" ondragleave="dndLeave(event)">
+      <div class="dnd-court-hdr">
+        <span class="dnd-court-title" style="color:${warn?'var(--red2)':'var(--teal)'};">COURT ${c}</span>
+        <span class="dnd-court-cnt" style="background:${warn?'rgba(192,57,43,0.15)':'rgba(39,174,96,0.15)'};color:${cntColor};">${cnt}/4${warn?` — need ${4-cnt}`:''}</span>
+      </div>
+      <div class="dnd-slots">
+        ${players.map(p=>`<div class="dnd-player" draggable="true" data-pid="${p.id}" ondragstart="dndStart(event,${p.id})">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge" style="margin-left:4px;">S</span>':''}</div>`).join('')}
+        ${Array.from({length:Math.max(0,4-cnt)},()=>'<div class="dnd-empty">Open Slot — drag a player here</div>').join('')}
+      </div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
+// Drag-and-drop handlers
+let dragPid=null;
+function dndStart(e,pid){dragPid=pid;e.dataTransfer.effectAllowed='move';e.target.classList.add('dragging');setTimeout(()=>{e.target.classList.add('dragging');},0);}
+function dndOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
+function dndLeave(e){e.currentTarget.classList.remove('drag-over');}
+async function dndDrop(e,targetCourt){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(!dragPid||!S.current)return;
+  const a=S.current.assignments;
+  // Remove from all courts
+  for(let c=1;c<=NC;c++)a[c]=(a[c]||[]).filter(id=>id!==dragPid);
+  // Add to target court (0 = unassigned, just remove)
+  if(targetCourt>0){
+    if(!a[targetCourt])a[targetCourt]=[];
+    if(a[targetCourt].length>=4){toast('Court '+targetCourt+' is full (4/4)','warn');dragPid=null;renderAssignUI();return;}
+    a[targetCourt].unshift(dragPid);
+  }
+  await setKV('current_session',S.current);
+  dragPid=null;
+  renderAssignUI();renderCourts();
+  toast('Player moved to '+(targetCourt>0?'Court '+targetCourt:'Unassigned'),'success');
+}
+async function saveAssignments(){
+  let ok=true,seen=[],underFull=[];
+  for(let c=1;c<=NC;c++){
+    const pl=S.current?.assignments[c]||[];
+    if(pl.length>4){toast('Court '+c+' has more than 4 players!','warn');ok=false;}
+    if(pl.length<4&&pl.length>0)underFull.push('C'+c+'('+pl.length+'/4)');
+    pl.forEach(id=>{if(seen.includes(id)){toast('Player on multiple courts!','warn');ok=false;}seen.push(id);});
+  }
+  if(!ok)return;
+  if(underFull.length>0){
+    if(!confirm('⚠️ Warning: '+underFull.join(', ')+' have fewer than 4 players. Save anyway?'))return;
+  }
+  await setKV('current_session',S.current);toast('Assignments saved!','success');renderAll();
+}
+
+// Quick add from court panel
+function showCourtAddPlayer(court){
+  openModal('Add Player to Court '+court,`
+    <label class="lbl">Select Player</label>
+    <select class="inp" id="modal-player-sel">
+      <option value="">— Choose —</option>
+      ${S.players.map(p=>`<option value="${p.id}">${esc(p.name)} (C${p.currentCourt})</option>`).join('')}
+    </select>
+    <button class="btn btn-primary" onclick="quickAddToCourt(${court})">Add to Court ${court}</button>`);
+}
+async function quickAddToCourt(court){
+  if(!S.current)return toast('No active session','warn');
+  const pid=parseInt(document.getElementById('modal-player-sel')?.value);
+  if(!pid)return toast('Select a player','warn');
+  const a=S.current.assignments;
+  for(let c=1;c<=NC;c++)a[c]=(a[c]||[]).filter(id=>id!==pid);
+  if(!a[court])a[court]=[];
+  if(a[court].length>=4)return toast('Court full','warn');
+  a[court].unshift(pid); // unshift so newly added player appears at top of court
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();closeModal();toast('Player added to Court '+court,'success');
+}
+
+// ══════════════════════════════════════════════
+// GYM VIEW
+// ══════════════════════════════════════════════
+function renderCourts(){
+  const assignments=S.current?S.current.assignments:autoAssign();
+  const cy=S.current?S.current.cycle:0;
+  const sub=document.getElementById('courts-sub');
+  if(sub)sub.textContent=S.current?`Session ${S.current.number} · ${S.current.date} · Cycle ${cy}/${NCYC}`:S.sessions.length?`${S.sessions.length}/8 sessions done`:'No active session';
+  const cb=document.getElementById('cybar');
+  if(cb)cb.innerHTML=Array.from({length:NCYC},(_,i)=>`<div class="cyseg ${i<cy-1?'done':i===cy-1&&S.current?'act':''}"></div>`).join('');
+  // Admin badge on courts page
+  const ab=document.getElementById('admin-court-badge');
+  if(ab)ab.innerHTML=adminUnlocked?'<span class="tag tg-yellow">⚙️ Admin</span>':'';
+  // Admin court panel
+  const acp=document.getElementById('admin-court-panel');
+  if(acp)acp.style.display=adminUnlocked&&S.current?'block':'none';
+  if(acp&&adminUnlocked&&S.current){
+    acp.innerHTML=`<div class="card"><div class="card-title">⚙️ Admin — Quick Add Player to Court</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        ${[1,2,3,4,5,6].map(c=>`<button class="btn btn-ghost btn-sm" style="width:100%;margin:0;" onclick="showCourtAddPlayer(${c})">+ Court ${c}</button>`).join('')}
+      </div></div>`;
+  }
+  const prevMv=S.current?.movements?.find(m=>m.cycle===cy-1)?.mv||{};
+  // GYM VIEW
+  const gv=document.getElementById('court-gym-view');
+  if(gv){
+    if(!S.players.length){gv.innerHTML='<div class="empty-state"><div class="ei">🏸</div><div class="em">No players yet — Admin → Players</div></div>';return;}
+    const makeCourtCard=(c)=>{
+      const pids=assignments[c]||[];
+      const players=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+      const cls=c<=3?`gc${c}`:'gcn';
+      const showMedals=!S.current||S.current.completed;
+      const medal=showMedals?(c===1?'🥇':c===2?'🥈':c===3?'🥉':''):'';
+      const cnt=players.length;
+      const cntColor=cnt===4?'var(--green2)':cnt===0?'var(--muted)':'var(--yellow2)';
+      return `<div class="gym-court ${cls}" onclick="showCourtDetail(${c})">
+        <div class="gc-header">
+          <span class="gc-num">C${c}</span>
+          <span style="font-size:9px;font-weight:800;color:${cntColor};">${cnt}/4</span>
+          <span class="gc-medal">${medal}</span>
+        </div>
+        <div class="gc-divider"></div>
+        <div class="gc-players">
+          ${[0,1].map(i=>{const p=players[i],mv=p?prevMv[p.id]:null;
+            return `<div class="gc-player ${!p?'empty':''}">${p?esc(p.name.split(' ')[0]):'Open'}${mv==='up'?'<span class="mv mv-u">↑</span>':mv==='down'?'<span class="mv mv-d">↓</span>':''}</div>`
+          }).join('')}
+        </div>
+        <div class="gc-net"></div>
+        <div class="gc-players">
+          ${[2,3].map(i=>{const p=players[i],mv=p?prevMv[p.id]:null;
+            return `<div class="gc-player ${!p?'empty':''}">${p?esc(p.name.split(' ')[0]):'Open'}${mv==='up'?'<span class="mv mv-u">↑</span>':mv==='down'?'<span class="mv mv-d">↓</span>':''}</div>`
+          }).join('')}
+        </div>
+      </div>`;
+    };
+    // Build court status summary
+    const shortCourts=[];
+    for(let c=1;c<=NC;c++){const n=(assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id)).length;if(n<4)shortCourts.push(`C${c}: ${n}/4`);}
+    const statusBar=shortCourts.length>0
+      ?`<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ Open slots: ${shortCourts.join(' · ')} — tap a court to see which player slots are empty</div>`
+      :`<div class="alert alert-success" style="margin-bottom:10px;font-size:12px;">✅ All courts full (4/4)</div>`;
+    gv.innerHTML=statusBar+`
+      <div class="gym-wrap">
+        <div class="gym-wall">← Entrance Side →</div>
+        <div class="gym-row">${[1,2,3].map(makeCourtCard).join('')}</div>
+        <div style="height:10px;background:linear-gradient(90deg,transparent,rgba(0,153,204,0.08),transparent);border-radius:4px;margin:4px 0;"></div>
+        <div class="gym-row">${[4,5,6].map(makeCourtCard).join('')}</div>
+        <div class="gym-wall">← Back Wall →</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px;">Tap any court to see full details</div>`;
+    // WhatsApp share button
+    gv.innerHTML+=`<button class="wa-btn" onclick="shareCourtAssignments()">📲 Share Court Assignments on WhatsApp</button>`;
+  }
+  // LIST VIEW
+  const lv=document.getElementById('court-list-view');
+  if(lv){
+    if(!S.players.length){lv.innerHTML='';return;}
+    let html='';
+    for(let c=1;c<=NC;c++){
+      const pids=assignments[c]||[];
+      const players=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+      const cls=c<=3?`lc${c}`:'lcn';
+      const showMedals=!S.current||S.current.completed;
+      const badge=showMedals?(c===1?'🥇 TOP':c===2?'🥈 2ND':c===3?'🥉 3RD':`COURT ${c}`):(`COURT ${c}`);
+      html+=`<div class="court-card ${cls}"><div class="court-header">
+        <div class="cnum">Court ${c}</div><span class="cbadge">${badge}</span></div>
+        <div class="court-players">${[0,1,2,3].map(i=>{
+          const p=players[i],mv=p?prevMv[p.id]:null;
+          return `<div class="pslot ${!p?'empty':''}">${p?esc(p.name):'Open Slot'}${p&&p.membershipType==='spare'?'<span class="spare-badge">S</span>':''}
+            ${mv==='up'?'<span class="mbadge mu">↑</span>':mv==='down'?'<span class="mbadge md">↓</span>':''}
+          </div>`;}).join('')}
+        </div></div>`;
+    }
+    lv.innerHTML=html;
+  }
+}
+
+function showCourtDetail(court){
+  const assignments=S.current?S.current.assignments:autoAssign();
+  const pids=assignments[court]||[];
+  const players=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+  const showMedals=!S.current||S.current.completed;
+  const badge=showMedals?(court===1?'🥇 Top Court':court===2?'🥈 2nd Court':court===3?'🥉 3rd Court':`Court ${court}`):`Court ${court}`;
+  openModal(`Court ${court} — ${badge}`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      ${[0,1,2,3].map(i=>{const p=players[i];
+        return `<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Player ${i+1}</div>
+          <div style="font-weight:800;font-size:13px;">${p?esc(p.name):'<span style="color:var(--muted);font-weight:400;font-style:italic;">Empty</span>'}</div>
+          ${p?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${p.seasonWins}W · ${p.seasonLosses}L</div>`:''}
+        </div>`;}).join('')}
+    </div>
+    ${S.current?`<div class="alert alert-info">Tap Scores tab to enter results for Court ${court}</div>`:''}
+    ${adminUnlocked?`<button class="btn btn-primary" onclick="closeModal();showCourtAddPlayer(${court})">+ Add Player to Court</button>`:''}
+  `);
+}
+
+function shareCourtAssignments(){
+  const assignments=S.current?S.current.assignments:autoAssign();
+  let msg=`🏸 *DC Badminton Club*\n*Court Assignments — ${S.current?S.current.date+', 2026':'Tonight'}*\n\n`;
+  for(let c=1;c<=NC;c++){
+    const players=(assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+    const medal=c===1?'🥇':c===2?'🥈':c===3?'🥉':'🏸';
+    msg+=`${medal} *Court ${c}*\n${players.map(p=>`• ${p.name}`).join('\n')||'• Empty'}\n\n`;
+  }
+  msg+=`📍 Maplewood SS · 700 Cope Drive\n⏰ 8:15–10:15 PM`;
+  const url=`https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank');
+}
+
+// ══════════════════════════════════════════════
+// SCORES
+// ══════════════════════════════════════════════
+function buildCombos(players){
+  // Returns combos array based on player count (2=singles best-of-3, 3=round-robin singles, 4=doubles)
+  const n=players.length;
+  if(n===4){
+    const[A,B,C,D]=players;
+    return[
+      {g:1,t:'Game 1',ta:`${A.name} & ${B.name}`,tb:`${C.name} & ${D.name}`,md:'(A+B vs C+D — Doubles)',a1:A.id,a2:B.id,b1:C.id,b2:D.id},
+      {g:2,t:'Game 2',ta:`${A.name} & ${C.name}`,tb:`${B.name} & ${D.name}`,md:'(A+C vs B+D — Doubles)',a1:A.id,a2:C.id,b1:B.id,b2:D.id},
+      {g:3,t:'Game 3',ta:`${A.name} & ${D.name}`,tb:`${B.name} & ${C.name}`,md:'(A+D vs B+C — Doubles)',a1:A.id,a2:D.id,b1:B.id,b2:C.id}
+    ];
+  }else if(n===3){
+    const[A,B,C]=players;
+    return[
+      {g:1,t:'Game 1',ta:A.name,tb:B.name,md:'(A vs B — Singles)',a1:A.id,a2:null,b1:B.id,b2:null},
+      {g:2,t:'Game 2',ta:A.name,tb:C.name,md:'(A vs C — Singles)',a1:A.id,a2:null,b1:C.id,b2:null},
+      {g:3,t:'Game 3',ta:B.name,tb:C.name,md:'(B vs C — Singles)',a1:B.id,a2:null,b1:C.id,b2:null}
+    ];
+  }else if(n===2){
+    const[A,B]=players;
+    return[
+      {g:1,t:'Game 1',ta:A.name,tb:B.name,md:'(A vs B — Singles)',a1:A.id,a2:null,b1:B.id,b2:null},
+      {g:2,t:'Game 2',ta:A.name,tb:B.name,md:'(A vs B — Singles)',a1:A.id,a2:null,b1:B.id,b2:null},
+      {g:3,t:'Game 3',ta:A.name,tb:B.name,md:'(A vs B — Singles)',a1:A.id,a2:null,b1:B.id,b2:null}
+    ];
+  }
+  return[];
+}
+function renderScoreEntry(){
+  const court=parseInt(document.getElementById('sc-sel').value);
+  const el=document.getElementById('score-area');if(!court){el.innerHTML='';return;}
+  if(!S.current){el.innerHTML='<div class="alert alert-warn">No active session. Ask admin to start one.</div>';return;}
+  const cy=S.current.cycle;
+  const players=(S.current.assignments[court]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+  if(players.length<2){
+    el.innerHTML=`<div class="alert alert-warn">Court ${court} has ${players.length===0?'no':'only 1'} player assigned — minimum 2 needed.</div>`;return;
+  }
+  const n=players.length;
+  const modeLabel=n===4?'Doubles (4 players)':n===3?'⚠️ 3 Players — Round-Robin Singles':'⚠️ 2 Players — Singles Best of 3';
+  const modeBg=n===4?'alert-info':n===3?'alert-warn':'alert-warn';
+  const combos=buildCombos(players);
+  // Player grid
+  const labels=['A','B','C','D'];
+  const gridCols=n===2?'1fr 1fr':n===3?'1fr 1fr 1fr':'1fr 1fr';
+  let playerGrid=players.map((p,i)=>`<div style="background:var(--s2);padding:6px 10px;border-radius:6px;">${labels[i]}: ${esc(p.name)}</div>`).join('');
+  let html=`<div class="alert ${modeBg}">Court ${court} · Cycle ${cy} · ${modeLabel}</div>
+    <div class="card" style="margin-bottom:10px;"><div class="card-title">🏸 Players on Court ${court}</div>
+      <div style="display:grid;grid-template-columns:${gridCols};gap:6px;font-size:12px;font-weight:700;">${playerGrid}</div>
+      ${n<4?`<div class="alert alert-warn" style="margin-top:10px;font-size:11px;">⚠️ <strong>Undersize court (${n} players)</strong> — playing singles. Admin may cascade a player from the court below.</div>`:''}
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">One person per court can enter all scores — confirm with all players before saving.</div>
+    </div>`;
+  combos.forEach(({g,t,ta,tb,md})=>{
+    const key=`c${court}_y${cy}_g${g}`,saved=S.current.scores[key];
+    html+=`<div class="game-block"><div class="glabel">${t} <span style="font-size:10px;color:var(--muted);font-weight:400;">${md}</span> ${saved?'<span class="saved-pill">✓ Saved</span>':''}</div>
+      <div class="grow">
+        <div class="tcol"><div class="tnames">${esc(ta)}</div>
+          <input type="number" class="sinp ${saved&&saved.w==='A'?'win':saved?'lose':''}" id="si_${court}_${g}_a" min="0" max="21" value="${saved?saved.sA:''}" placeholder="0" oninput="liveW(${court},${g})" inputmode="numeric"></div>
+        <div class="vs">VS</div>
+        <div class="tcol"><div class="tnames">${esc(tb)}</div>
+          <input type="number" class="sinp ${saved&&saved.w==='B'?'win':saved?'lose':''}" id="si_${court}_${g}_b" min="0" max="21" value="${saved?saved.sB:''}" placeholder="0" oninput="liveW(${court},${g})" inputmode="numeric"></div>
+      </div><div id="wr_${court}_${g}" style="text-align:center;min-height:22px;margin-top:6px;"></div>
+      <button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%;" onclick="saveGameScore(${court},${g})">💾 Save Game ${g}</button>
+    </div>`;
+  });
+  html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button><div id="res-${court}" style="margin-top:10px;"></div>`;
+  el.innerHTML=html;combos.forEach(({g})=>liveW(court,g));
+}
+function liveW(c,g){
+  const a=document.getElementById(`si_${c}_${g}_a`),b=document.getElementById(`si_${c}_${g}_b`),w=document.getElementById(`wr_${c}_${g}`);
+  if(!a||!b||!w)return;const sa=parseInt(a.value),sb=parseInt(b.value);
+  if(isNaN(sa)||isNaN(sb)){w.innerHTML='';return;}
+  if(sa>21||sb>21){a.className='sinp';b.className='sinp';w.innerHTML=`<span class="tag tg-red">❌ Max score is 21 — games are first to 21, no deuce</span>`;return;}
+  if(sa>sb){a.className='sinp win';b.className='sinp lose';w.innerHTML=`<span class="tag tg-green">Team A wins ${sa}–${sb}</span>${sa!==21?' <span style="color:var(--yellow2);">(⚠ Neither team at 21 — check score)</span>':''}`;
+  }else if(sb>sa){b.className='sinp win';a.className='sinp lose';w.innerHTML=`<span class="tag tg-green">Team B wins ${sb}–${sa}</span>${sb!==21?' <span style="color:var(--yellow2);">(⚠ Neither team at 21 — check score)</span>':''}`;
+  }else if(sa>0){a.className='sinp';b.className='sinp';w.innerHTML=`<span class="tag tg-yellow">⚠️ Tied ${sa}–${sb} — Not valid! One team must reach 21</span>`;}
+  else{a.className='sinp';b.className='sinp';w.innerHTML='';}
+}
+async function saveGameScore(court,gameNum){
+  if(!S.current)return toast('No session','warn');
+  const cy=S.current.cycle;
+  const players=(S.current.assignments[court]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+  if(players.length<2)return toast('Need at least 2 players on this court','warn');
+  const combos=buildCombos(players);
+  const combo=combos.find(c=>c.g===gameNum);if(!combo){toast('Invalid game','warn');return;}
+  const sa=parseInt(document.getElementById(`si_${court}_${gameNum}_a`)?.value);
+  const sb=parseInt(document.getElementById(`si_${court}_${gameNum}_b`)?.value);
+  if(isNaN(sa)||isNaN(sb)){toast('Enter both scores','warn');return;}
+  if(sa<0||sb<0){toast('No negative scores','warn');return;}
+  if(sa>21||sb>21){toast('Max score is 21 — games end at first to 21','warn');return;}
+  if(sa===sb&&!confirm(`Game ${gameNum}: tied ${sa}–${sb}. Save anyway?`)){return;}
+  const key=`c${court}_y${cy}_g${gameNum}`;
+  S.current.scores[key]={a1:combo.a1,a2:combo.a2,b1:combo.b1,b2:combo.b2,sA:sa,sB:sb,w:sa>sb?'A':sb>sa?'B':'T'};
+  await setKV('current_session',S.current);
+  renderScoreEntry();toast(`Game ${gameNum} saved!`,'success');
+}
+
+async function saveScores(court){
+  if(!S.current)return toast('No session','warn');
+  const cy=S.current.cycle;
+  const players=(S.current.assignments[court]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+  if(players.length<2)return toast('Need at least 2 players','warn');
+  const combos=buildCombos(players);
+  let valid=true;const entries=[];
+  combos.forEach(({g,a1,a2,b1,b2})=>{
+    const sa=parseInt(document.getElementById(`si_${court}_${g}_a`)?.value);
+    const sb=parseInt(document.getElementById(`si_${court}_${g}_b`)?.value);
+    if(isNaN(sa)||isNaN(sb)){toast('Enter all 3 scores','warn');valid=false;return;}
+    if(sa<0||sb<0){toast('No negative scores','warn');valid=false;return;}
+    if(sa>21||sb>21){toast('Max score is 21 — games end at first to 21','warn');valid=false;return;}
+    if(sa===sb&&!confirm(`Game ${g}: tied ${sa}–${sb}. Save anyway?`)){valid=false;return;}
+    entries.push({g,a1,a2,b1,b2,sA:sa,sB:sb,w:sa>sb?'A':sb>sa?'B':'T'});
+  });
+  if(!valid)return;
+  const btn=document.getElementById(`sbtn_${court}`);
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving...';}
+  S.lastUndo={court,cy,keys:entries.map(e=>`c${court}_y${cy}_g${e.g}`)};
+  entries.forEach(e=>S.current.scores[`c${court}_y${cy}_g${e.g}`]=e);
+  await setKV('current_session',S.current);
+  const wins={};players.forEach(p=>wins[p.id]=0);
+  entries.forEach(e=>{if(e.w==='A'){wins[e.a1]++;wins[e.a2]++;}else if(e.w==='B'){wins[e.b1]++;wins[e.b2]++;}});
+  const sorted=[...players].sort((a,b)=>wins[b.id]-wins[a.id]);
+  // Each player's max possible wins depends on mode (4p doubles=3 games, 3p rr=2 games, 2p=3 games)
+  const maxWins=players.length===3?2:3;
+  const re=document.getElementById(`res-${court}`);
+  if(re)re.innerHTML=`<div class="card"><div class="card-title">✅ Court ${court} Tally${players.length<4?' (Singles)':''}</div>
+    ${sorted.map((p,i)=>`<div class="lbrow"><div class="lbrank ${i===0?'r1':''}">${i+1}</div>
+      <div class="lbinfo"><div class="lbname">${esc(p.name)}</div></div>
+      <span class="tag ${wins[p.id]===maxWins?'tg-green':wins[p.id]===0?'tg-red':'tg-teal'}">${wins[p.id]}W · ${maxWins-wins[p.id]}L</span>
+      ${i===0&&court>1?'<span class="tag tg-green" style="margin-left:4px;">↑ Up</span>':''}
+      ${i===sorted.length-1&&court<NC?'<span class="tag tg-red" style="margin-left:4px;">↓ Down</span>':''}
+    </div>`).join('')}</div>`;
+  renderScoreEntry();toast('Court '+court+' saved!','success');
+}
+
+// ══════════════════════════════════════════════
+// STANDINGS
+// ══════════════════════════════════════════════
+function renderLeaderboard(){
+  const el=document.getElementById('sec-lb');if(!el)return;
+  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">🏆</div><div class="em">No players yet</div></div>';return;}
+  const sorted=[...S.players].sort((a,b)=>{
+    if(b.seasonWins !== a.seasonWins) return b.seasonWins - a.seasonWins;
+    const wr_a = a.gamesPlayed>0 ? a.seasonWins/a.gamesPlayed : 0;
+    const wr_b = b.gamesPlayed>0 ? b.seasonWins/b.gamesPlayed : 0;
+    if(wr_a !== wr_b) return wr_b - wr_a;
+    return Math.random() - 0.5;
+  });
+  el.innerHTML=sorted.map((p,i)=>{
+    const wr=p.gamesPlayed>0?Math.round(p.seasonWins/p.gamesPlayed*100):0;
+    return `<div class="lbrow">
+      <div class="lbrank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}</div><div class="lbsub">Court ${p.currentCourt} · ${p.gamesPlayed} games</div></div>
+      <div class="lbnums">
+        <div class="lbnum"><div class="v">${p.seasonWins}</div><div class="l">W</div></div>
+        <div class="lbnum"><div class="v">${p.seasonLosses}</div><div class="l">L</div></div>
+        <div class="lbnum"><div class="v">${wr}%</div><div class="l">Win%</div></div>
+      </div></div>`;
+  }).join('');
+}
+function computePlayerStreakAndImprovement(){
+  // Returns {playerId: {streak, maxStreak, improvement, totalAbsences}}
+  const result={};
+  S.players.forEach(p=>{
+    let cur=0,max=0;
+    S.sessions.forEach(s=>{
+      let sessWins=0,sessTotalGames=0;
+      (s.movements||[]).forEach(m=>{sessWins+=m.wins?.[p.id]||0;sessTotalGames+=NG;});
+      if(sessTotalGames>0&&sessWins>sessTotalGames/2){cur++;max=Math.max(max,cur);}
+      else if(sessTotalGames>0){cur=0;}
+    });
+    const startCourt=p.membershipType==='spare'?6:3;
+    const improvement=startCourt-(p.highestCourt||startCourt);
+    result[p.id]={streak:cur,maxStreak:max,improvement:Math.max(0,improvement)};
+  });
+  return result;
+}
+function renderPlayerStats(){
+  const el=document.getElementById('sec-pstats');if(!el)return;
+  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
+  const displayPlayers = adminUnlocked ? S.players : S.players.map(p=>({...p, email:'', phone:'', emergency:'', medical:''}));
+  // Compute awards
+  const streakData=computePlayerStreakAndImprovement();
+  const mostImprovedId=S.players.reduce((best,p)=>(streakData[p.id]?.improvement||0)>(streakData[best]?.improvement||0)?p.id:best,S.players[0]?.id);
+  const mostConsistentId=S.players.reduce((best,p)=>(p.noShowCount||0)<(S.players.find(x=>x.id===best)?.noShowCount||0)?p.id:best,S.players[0]?.id);
+  const longestStreakId=S.players.reduce((best,p)=>(streakData[p.id]?.maxStreak||0)>(streakData[best]?.maxStreak||0)?p.id:best,S.players[0]?.id);
+  // Awards banner
+  let awardsHtml='';
+  if(S.sessions.length>0){
+    awardsHtml=`<div class="card" style="border-color:var(--gold);margin-bottom:12px;">
+      <div class="card-title" style="color:var(--gold);">🏆 Season Awards</div>
+      ${longestStreakId&&streakData[longestStreakId]?.maxStreak>0?`<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><span>🔥 Longest Win Streak</span><span style="font-weight:800;color:var(--yellow2);">${esc(S.players.find(p=>p.id===longestStreakId)?.name||'—')} (${streakData[longestStreakId]?.maxStreak} sessions)</span></div>`:''}
+      ${mostImprovedId&&(streakData[mostImprovedId]?.improvement||0)>0?`<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"><span>📈 Most Improved</span><span style="font-weight:800;color:var(--green2);">${esc(S.players.find(p=>p.id===mostImprovedId)?.name||'—')} (+${streakData[mostImprovedId]?.improvement} courts)</span></div>`:''}
+      ${mostConsistentId?`<div style="padding:8px 0;display:flex;justify-content:space-between;align-items:center;"><span>🏅 Most Consistent</span><span style="font-weight:800;color:var(--teal2);">${esc(S.players.find(p=>p.id===mostConsistentId)?.name||'—')} (${S.players.find(p=>p.id===mostConsistentId)?.noShowCount||0} absences)</span></div>`:''}
+    </div>`;
+  }
+  el.innerHTML=awardsHtml+displayPlayers.map(p=>{
+    const wr=p.gamesPlayed>0?Math.round(p.seasonWins/p.gamesPlayed*100):0;
+    let totalBirds=0;
+    S.sessions.forEach(s=>{
+      Object.values(s.birdDistribution||{}).forEach(bd=>{if(bd.playerId===p.id)totalBirds+=bd.birdsReceived;});
+    });
+    const sd=streakData[p.id]||{};
+    const awards=[];
+    if(p.id===longestStreakId&&sd.maxStreak>0)awards.push('🔥');
+    if(p.id===mostImprovedId&&sd.improvement>0)awards.push('📈');
+    if(p.id===mostConsistentId)awards.push('🏅');
+    return `<div class="card"><div class="flex-between" style="margin-bottom:10px;">
+      <div style="font-weight:800;font-size:15px;">${esc(p.name)}${awards.length?` <span style="font-size:14px;">${awards.join('')}</span>`:''}</div>
+      <span class="tag tg-teal">Court ${p.currentCourt}</span></div>
+      <div class="sgrid">
+        <div class="sbox"><div class="sv">${p.seasonWins}</div><div class="sl">Wins</div></div>
+        <div class="sbox"><div class="sv">${p.seasonLosses}</div><div class="sl">Losses</div></div>
+        <div class="sbox"><div class="sv">${wr}%</div><div class="sl">Win Rate</div></div>
+        <div class="sbox"><div class="sv">C${p.highestCourt}</div><div class="sl">Best Court</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;">
+        <div>🔥 Current streak: <strong>${sd.streak||0}</strong></div>
+        <div>🏆 Best streak: <strong>${sd.maxStreak||0}</strong></div>
+        <div>📈 Court climb: <strong>+${sd.improvement||0}</strong></div>
+        <div>❌ Absences: <strong>${p.noShowCount||0}</strong></div>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted);">🪶 Shuttlecocks: ${totalBirds} received</div>
+</div>`;
+  }).join('');
+}
+function renderHeatmap(){
+  const el=document.getElementById('sec-heat');if(!el)return;
+  if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">🔥</div><div class="em">No sessions yet</div></div>';return;}
+  // Court history per player across sessions
+  const colors={1:'rgba(255,215,0,0.8)',2:'rgba(192,192,192,0.7)',3:'rgba(205,127,50,0.7)',4:'rgba(0,153,204,0.5)',5:'rgba(100,160,200,0.4)',6:'rgba(60,100,140,0.3)'};
+  el.innerHTML=`<div class="card"><div class="card-title">🔥 Court History by Player</div>
+    <div style="display:flex;gap:4px;margin-bottom:10px;font-size:9px;color:var(--muted);">
+      ${S.sessions.map(s=>`<div style="flex:1;text-align:center;">S${s.number}</div>`).join('')}
+    </div>
+    ${S.players.map(p=>`<div class="heatmap-row">
+      <div class="heatmap-name">${esc(p.name.split(' ')[0])}</div>
+      <div class="heatmap-cells">
+        ${S.sessions.map(s=>{
+          let court=null;
+          for(let c=1;c<=NC;c++)if((s.assignments[c]||[]).includes(p.id)){court=c;break;}
+          return `<div class="hm-cell" style="background:${court?colors[court]:'var(--s3)'};">${court?court:'—'}</div>`;
+        }).join('')}
+      </div>
+    </div>`).join('')}
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+      ${[1,2,3,4,5,6].map(c=>`<div style="display:flex;align-items:center;gap:4px;font-size:10px;"><div style="width:12px;height:12px;border-radius:3px;background:${colors[c]};"></div>C${c}</div>`).join('')}
+    </div>
+  </div>`;
+}
+function renderHistory(){
+  const el=document.getElementById('sec-hist');if(!el)return;
+  if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">📅</div><div class="em">No completed sessions yet</div></div>';return;}
+  el.innerHTML=[...S.sessions].reverse().map(s=>`
+    <div class="card"><div class="flex-between" style="margin-bottom:8px;">
+      <div style="font-weight:800;">Session ${s.number} — ${s.date}, 2026</div>
+      <span class="tag tg-green">✓ Done</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;">
+        ${Object.entries(s.assignments||{}).map(([c,ids])=>`
+          <div style="background:var(--s2);border-radius:7px;padding:7px;font-size:11px;">
+            <div style="color:var(--teal);font-weight:800;margin-bottom:3px;">C${c}</div>
+            ${(ids||[]).map(id=>{const p=S.players.find(x=>x.id===id);return p?`<div>${esc(p.name.split(' ')[0])}</div>`:'';}).join('')}
+          </div>`).join('')}
+      </div></div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+// REGISTRATION
+// ══════════════════════════════════════════════
+function selectMembership(type){
+  regData.membershipType=type;
+  document.getElementById('mt-regular-box').className='membership-box'+(type==='regular'?' active-box':'');
+  document.getElementById('mt-spare-box').className='membership-box'+(type==='spare'?' active-box':'');
+  const w5row=document.getElementById('w5-row');if(w5row)w5row.style.display=type==='regular'?'flex':'none';
+  const w6row=document.getElementById('w6-row');if(w6row)w6row.style.display=type==='spare'?'flex':'none';
+  // Uncheck the hidden one to avoid accidental validation pass
+  if(type==='regular'){const cb=document.getElementById('w6');if(cb)cb.checked=false;}
+  else{const cb=document.getElementById('w5');if(cb)cb.checked=false;}
+}
+function regStep1(){
+  const name=g('r-name').trim(),email=g('r-email').trim(),phone=g('r-phone').trim(),emergency=g('r-emergency').trim();
+  if(!name||!email||!phone||!emergency){toast('Fill all required fields','warn');return;}
+  if(!email.includes('@')){toast('Valid email required','warn');return;}
+  const type=regData.membershipType||'regular';
+  // Check regular capacity — allow waitlist if full
+  if(type==='regular'){
+    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+    if(regularCount>=24){
+      if(!confirm('Regular slots are FULL (24/24). You will be added to the WAITLIST and notified if a spot opens. Continue?'))return;
+      regData.waitlisted=true;
+    } else {
+      regData.waitlisted=false;
+    }
+  } else {
+    regData.waitlisted=false;
+  }
+  if(S.players.find(p=>p.email.toLowerCase()===email.toLowerCase())){toast('Email already registered!','warn');return;}
+  regData={...regData,name,email,phone,emergency,medical:g('r-medical').trim(),membershipType:type};
+  // Show/hide payment checkboxes based on membership type
+  const w5row=document.getElementById('w5-row');if(w5row)w5row.style.display=type==='regular'?'flex':'none';
+  const w6row=document.getElementById('w6-row');if(w6row)w6row.style.display=type==='spare'?'flex':'none';
+  goRS(2);
+}
+async function regStep2(){
+  const checkboxes=['w1','w2','w3','w4','w7','w8','w9'];
+  if(regData.membershipType==='regular')checkboxes.push('w5');
+  else checkboxes.push('w6');
+  if(!checkboxes.every(id=>document.getElementById(id)?.checked)){
+    toast(regData.membershipType==='spare'?'Check all boxes including the per-session fee acknowledgment':'Check all required boxes','warn');return;
+  }
+  const sig=g('r-sig').trim();if(!sig){toast('Enter digital signature','warn');return;}
+  regData.waiverSig=sig;goRS(3);
+}
+async function regStep3(){
+  if(!document.getElementById('lf-all')?.checked){toast('Please agree to the league format rules to continue','warn');return;}
+  const sig=g('r-sig-lf').trim();if(!sig){toast('Enter digital signature','warn');return;}
+  const btn=document.getElementById('reg-btn-lf');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving...';
+  try{
+    const isRegular=regData.membershipType!=='spare';
+    await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,waiver_signed:true,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0,membership_type:regData.membershipType||'regular',approved:false,registered_at:new Date().toISOString(),waitlisted:regData.waitlisted||false,no_show_count:0});
+    localStorage.setItem('dcbc-email',regData.email);
+    // Update success screen based on type
+    const successMsg=document.getElementById('reg-success-msg');
+    const payNote=document.getElementById('reg-payment-note');
+    if(successMsg)successMsg.textContent=regData.membershipType==='spare'?'Registered as Spare — Admin will contact you when needed.':regData.waitlisted?'You have been added to the Regular Waitlist. Admin will promote you when a spot opens.':'Your registration is pending admin approval.';
+    if(payNote){payNote.style.display=regData.membershipType==='spare'?'none':'block';}
+    // Show spare-specific payment note
+    const spareNote=document.getElementById('reg-spare-payment-note');
+    if(spareNote)spareNote.style.display=regData.membershipType==='spare'?'block':'none';
+    await loadAll();renderAll();goRS(4);
+  }catch(e){toast('Error — try again','error');}
+  btn.disabled=false;btn.innerHTML='Submit Registration →';
+}
+async function approvePlayer(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  if(p.membershipType!=='spare'&&!p.waitlisted){
+    const regularCount=S.players.filter(x=>x.membershipType!=='spare'&&!x.waitlisted&&x.approved&&x.id!==id).length;
+    if(regularCount>=24){
+      if(!confirm('⚠️ Regular slots are FULL (24/24). Approve this player and add to WAITLIST instead?'))return;
+      await sbU('players',id,{approved:true,waitlisted:true});
+      await loadAll();renderAll();toast('Approved (waitlisted — regular slots full)','warn');return;
+    }
+  }
+  await sbU('players',id,{approved:true});await loadAll();renderAll();toast('Player approved!','success');
+}
+async function rejectPlayer(id){
+  const p=S.players.find(x=>x.id===id);
+  if(!p||!confirm(`Remove ${p.name}'s registration? This cannot be undone.`))return;
+  await sbD('players',id);await loadAll();renderAll();toast('Registration removed','warn');
+}
+function goRS(n){
+  document.querySelectorAll('.reg-step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('rs'+n).classList.add('active');
+  [1,2,3,4].forEach(i=>{const d=document.getElementById('sd'+i);if(!d)return;d.className='sdot-s '+(i<n?'done':i===n?'act':'pend');d.textContent=i<n?'✓':i;});
+  [1,2,3].forEach(i=>{const l=document.getElementById('sl'+i);if(l)l.className='sline'+(i<n?' done':'');});
+}
+function renderRegPage(){
+  const myEmail=localStorage.getItem('dcbc-email'),already=document.getElementById('reg-already'),form=document.getElementById('reg-form');
+  // Update capacity display (exclude waitlisted from count — they don't hold active slots)
+  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+  const slotsEl=document.getElementById('reg-slots-text');
+  if(slotsEl){
+    const remaining=24-regularCount;
+    if(remaining<=0){slotsEl.innerHTML='<span style="color:var(--red2);font-weight:800;">FULL</span>';}
+    else{slotsEl.innerHTML=`<span style="color:var(--green2);">${remaining} spots left</span>`;}
+  }
+  if(regularCount>=24){
+    const regularBox=document.getElementById('mt-regular-box');
+    if(regularBox){
+      const waitlistCount=S.players.filter(p=>p.membershipType==='regular'&&p.waitlisted).length;
+      regularBox.title='Regular slots full — you will join the waitlist';
+      // Add waitlist sub-label if not already present
+      const sub=regularBox.querySelector('.waitlist-sub');
+      if(!sub){const d=document.createElement('div');d.className='waitlist-sub';d.style.cssText='font-size:10px;color:var(--teal2);margin-top:4px;';d.textContent=`FULL — Join Waitlist (#${waitlistCount+1})`;regularBox.appendChild(d);}
+    }
+  }
+  if(myEmail){
+    const me=S.players.find(p=>p.email.toLowerCase()===myEmail.toLowerCase());
+    if(me){
+      already.style.display='block';form.style.display='none';
+      const isSpare=me.membershipType==='spare';
+      const approvalStatus=me.approved?'<span class="tag tg-green">✅ Approved</span>':'<span class="tag tg-yellow">⏳ Pending Admin Approval</span>';
+      already.innerHTML=`
+        ${!me.approved?`<div class="pending-banner">⏳ Your registration is pending admin approval.<br><small style="font-weight:400;">You'll get full access once approved.</small></div>`:'<div class="alert alert-success">✅ You\'re registered and approved!</div>'}
+        <div class="card">
+          <div class="flex-between" style="margin-bottom:10px;">
+            <div style="font-weight:800;font-size:16px;">${esc(me.name)}${isSpare?'<span class="spare-badge">SPARE</span>':''}</div>
+            <div style="display:flex;gap:6px;align-items:center;">${approvalStatus}<span class="tag ${me.paid?'tg-green':'tg-yellow'}">${me.paid?'✅ Paid':'⏳ Unpaid'}</span></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);">${esc(me.email)} · ${esc(me.phone)}</div>
+          <div class="divider"></div>
+          <div style="font-size:12px;">Membership: <strong>${isSpare?'Spare Player':'Regular Member'}</strong></div>
+          <div style="font-size:12px;margin-top:4px;">Waiver: <span style="color:var(--green2);">✓ Signed</span></div>
+          ${me.approved?`<div style="font-size:12px;margin-top:4px;">Court: <strong>Court ${me.currentCourt}</strong></div>`:''}
+          ${!me.paid&&!isSpare?`<div class="alert alert-warn" style="margin-top:10px;">E-transfer $150 to <strong>christygeorge993@gmail.com</strong></div>`:''}
+          ${isSpare&&!me.paid?`<div class="alert alert-info" style="margin-top:10px;">💡 As a spare, you pay $24.50 per session when called in. E-transfer to christygeorge993@gmail.com before or on the session date.</div>`:''}
+        </div>
+        <button class="btn btn-ghost" onclick="localStorage.removeItem('dcbc-email');renderRegPage()">Register different player</button>`;
+      return;
+    }
+  }
+  already.style.display='none';form.style.display='block';
+}
+
+// ══════════════════════════════════════════════
+// TOOLS
+// ══════════════════════════════════════════════
+async function undoScore(){
+  if(!S.lastUndo||!S.current)return toast('Nothing to undo','warn');
+  if(S.current.cycle!==S.lastUndo.cy)return toast('Cannot undo — cycle advanced','warn');
+  S.lastUndo.keys.forEach(k=>delete S.current.scores[k]);S.lastUndo=null;
+  await setKV('current_session',S.current);await loadAll();renderAll();toast('Scores undone','success');
+}
+async function clearCycleScores(){
+  if(!S.current)return toast('No session','warn');
+  if(!confirm('Clear all scores for cycle '+S.current.cycle+'?'))return;
+  const cy=S.current.cycle;Object.keys(S.current.scores).forEach(k=>{if(k.includes(`_y${cy}_`))delete S.current.scores[k];});
+  S.lastUndo=null;await setKV('current_session',S.current);await loadAll();renderAll();toast('Scores cleared','warn');
+}
+function exportData(){
+  const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='dcbc-backup.json';a.click();
+}
+async function hardReset(){
+  if(!confirm('⚠️ Wipe ALL data?'))return;if(!confirm('Last chance!'))return;
+  await Promise.all([setKV('current_session',null),setKV('completed_sessions',[])]);
+  const[ps,as]=await Promise.all([sbG('players'),sbG('announcements')]);
+  await Promise.all([...(ps||[]).map(p=>sbD('players',p.id)),...(as||[]).map(a=>sbD('announcements',a.id))]);
+  await loadAll();renderAll();toast('Reset complete','warn');
+}
+
+// ══════════════════════════════════════════════
+// SEASON PDF
+// ══════════════════════════════════════════════
+function generateSeasonPDF(){
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210,mg=18,lh=7;
+    let y=mg;
+    const navy=[13,33,55],teal=[0,153,204],green=[39,174,96],red=[192,57,43],gold=[200,160,0];
+    // Header
+    doc.setFillColor(...navy);doc.rect(0,0,W,30,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(20);doc.setFont(undefined,'bold');
+    doc.text('DC Badminton Club',W/2,12,{align:'center'});
+    doc.setFontSize(11);doc.setFont(undefined,'normal');
+    doc.text('Maplewood Advanced League · Season 2026 Summary',W/2,20,{align:'center'});
+    doc.setFontSize(9);doc.text(`Generated: ${new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'})}`,W/2,27,{align:'center'});
+    y=38;
+    // Season Overview
+    doc.setTextColor(...navy);doc.setFontSize(13);doc.setFont(undefined,'bold');
+    doc.text('Season Overview',mg,y);y+=lh;
+    doc.setDrawColor(...teal);doc.setLineWidth(0.5);doc.line(mg,y,W-mg,y);y+=4;
+    doc.setFont(undefined,'normal');doc.setFontSize(10);doc.setTextColor(50,50,50);
+    const totalSess=S.sessions.length;
+    let totalBirds=0;
+    S.sessions.forEach(s=>Object.values(s.birdDistribution||{}).forEach(b=>totalBirds+=b.birdsReceived||0));
+    const totalGames=S.players.reduce((s,p)=>s+(p.gamesPlayed||0),0);
+    doc.text(`Sessions Played: ${totalSess}/8`,mg,y);y+=lh;
+    doc.text(`Total Games Played: ${totalGames}`,mg,y);y+=lh;
+    doc.text(`Total Shuttlecocks Used: ${totalBirds}`,mg,y);y+=lh;
+    doc.text(`Total Players: ${S.players.length} (${S.players.filter(p=>p.membershipType!=='spare').length} Regular · ${S.players.filter(p=>p.membershipType==='spare').length} Spare)`,mg,y);y+=lh+4;
+    // Awards
+    const sd=computePlayerStreakAndImprovement();
+    const longestStreakId=S.players.reduce((best,p)=>(sd[p.id]?.maxStreak||0)>(sd[best]?.maxStreak||0)?p.id:best,S.players[0]?.id||0);
+    const mostImprovedId=S.players.reduce((best,p)=>(sd[p.id]?.improvement||0)>(sd[best]?.improvement||0)?p.id:best,S.players[0]?.id||0);
+    const mostConsistentId=S.players.reduce((best,p)=>(p.noShowCount||0)<(S.players.find(x=>x.id===best)?.noShowCount||Infinity)?p.id:best,S.players[0]?.id||0);
+    if(S.players.length>0){
+      doc.setFontSize(13);doc.setFont(undefined,'bold');doc.setTextColor(...navy);
+      doc.text('Season Awards',mg,y);y+=lh;
+      doc.setDrawColor(...gold);doc.line(mg,y,W-mg,y);y+=4;
+      doc.setFont(undefined,'normal');doc.setFontSize(10);doc.setTextColor(50,50,50);
+      const lsP=S.players.find(p=>p.id===longestStreakId);
+      const miP=S.players.find(p=>p.id===mostImprovedId);
+      const mcP=S.players.find(p=>p.id===mostConsistentId);
+      if(lsP)doc.text(`🏆 Longest Win Streak: ${lsP.name} (${sd[lsP.id]?.maxStreak||0} sessions)`,mg,y),y+=lh;
+      if(miP)doc.text(`📈 Most Improved: ${miP.name} (climbed ${sd[miP.id]?.improvement||0} courts)`,mg,y),y+=lh;
+      if(mcP)doc.text(`🏅 Most Consistent: ${mcP.name} (${mcP.noShowCount||0} absences)`,mg,y),y+=lh+4;
+    }
+    // Final Standings
+    doc.setFontSize(13);doc.setFont(undefined,'bold');doc.setTextColor(...navy);
+    doc.text('Final Standings',mg,y);y+=lh;
+    doc.setDrawColor(...teal);doc.line(mg,y,W-mg,y);y+=5;
+    // Table header
+    doc.setFillColor(230,240,255);doc.rect(mg,y-4,W-mg*2,7,'F');
+    doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(50,50,50);
+    const cols=[mg,mg+6,mg+60,mg+95,mg+115,mg+135,mg+158];
+    ['#','Name','Membership','Wins','Losses','Win%','Best Court'].forEach((h,i)=>doc.text(h,cols[i],y));
+    y+=lh;
+    const sorted=[...S.players].sort((a,b)=>b.seasonWins-a.seasonWins||(b.gamesPlayed>0?b.seasonWins/b.gamesPlayed:0)-(a.gamesPlayed>0?a.seasonWins/a.gamesPlayed:0));
+    doc.setFont(undefined,'normal');doc.setFontSize(9);
+    sorted.forEach((p,i)=>{
+      if(y>270){doc.addPage();y=mg;}
+      if(i%2===0){doc.setFillColor(248,250,252);doc.rect(mg,y-4,W-mg*2,7,'F');}
+      doc.setTextColor(50,50,50);
+      const wr=p.gamesPlayed>0?Math.round(p.seasonWins/p.gamesPlayed*100):0;
+      const rowData=[String(i+1),p.name.length>20?p.name.substring(0,19)+'…':p.name,p.membershipType==='spare'?'Spare':'Regular',String(p.seasonWins),String(p.seasonLosses),wr+'%','C'+p.highestCourt];
+      rowData.forEach((v,ci)=>doc.text(v,cols[ci],y));
+      y+=lh;
+    });
+    y+=4;
+    // Session History
+    if(S.sessions.length>0){
+      if(y>240){doc.addPage();y=mg;}
+      doc.setFontSize(13);doc.setFont(undefined,'bold');doc.setTextColor(...navy);
+      doc.text('Session History',mg,y);y+=lh;
+      doc.setDrawColor(...teal);doc.line(mg,y,W-mg,y);y+=5;
+      doc.setFont(undefined,'normal');doc.setFontSize(9);doc.setTextColor(50,50,50);
+      S.sessions.forEach(s=>{
+        if(y>270){doc.addPage();y=mg;}
+        let birds=0;Object.values(s.birdDistribution||{}).forEach(b=>birds+=b.birdsReceived||0);
+        doc.text(`Session ${s.number} — ${s.date}, 2026 · ${s.movements?.length||0} cycles · 🪶 ${birds} birds`,mg,y);y+=lh;
+      });
+    }
+    // Footer
+    const pages=doc.getNumberOfPages();
+    for(let i=1;i<=pages;i++){
+      doc.setPage(i);
+      doc.setFillColor(...navy);doc.rect(0,285,W,12,'F');
+      doc.setFontSize(8);doc.setTextColor(150,180,210);
+      doc.text('DC Badminton Club · Maplewood Advanced League 2026',mg,292);
+      doc.text(`Page ${i}/${pages}`,W-mg,292,{align:'right'});
+    }
+    doc.save('DC_Badminton_Season_2026.pdf');
+    toast('PDF downloaded!','success');
+  }catch(e){toast('PDF error — check browser console','error');console.error(e);}
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function g(id){return document.getElementById(id)?.value||'';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+let toastT;
+function toast(msg,type='info'){
+  let t=document.getElementById('_t');
+  if(!t){t=document.createElement('div');t.id='_t';t.style.cssText='position:fixed;bottom:82px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:25px;font-size:13px;font-weight:700;z-index:500;pointer-events:none;white-space:nowrap;max-width:88vw;text-align:center;transition:opacity 0.3s;';document.body.appendChild(t);}
+  const c={success:'#27ae60',warn:'#f39c12',error:'#e74c3c',info:'#0099cc'};
+  t.style.background=c[type]||c.info;t.style.color='#fff';t.style.opacity='1';t.textContent=msg;
+  clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity='0',2800);
+}
+function openModal(title,body){document.getElementById('modal-title').textContent=title;document.getElementById('modal-body').innerHTML=body;document.getElementById('modal').classList.add('open');}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+
+// ══════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════
+function renderAll(){
+  checkRegistrationStatus();
+  renderHome();renderRegPage();renderCourts();renderSchedule();
+  renderLeaderboard();renderPlayerStats();renderHeatmap();renderHistory();renderRSVP();renderQA();
+  renderPOS('pos-standings');
+  if(adminUnlocked){renderAdminPlayers();renderRegPlayers();renderSessionAdmin();renderAssignUI();renderPayments();renderAnnouncementsAdmin();}
+  const sel=document.getElementById('sc-sel');if(sel&&sel.value)renderScoreEntry();
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+async function init(){
+  await initInviteGate();
+  setSS('syncing');
+  const ok=await loadAll();
+  if(ok){setSS('ok');checkRegistrationStatus();renderAll();startSync();setInterval(renderHome,30000);}
+  else{setSS('err');toast('Cannot connect to database','error');}
+}
+
+// ══════════════════════════════════════════════
+// LATE ARRIVALS & BIRD DISTRIBUTION
+// ══════════════════════════════════════════════
+async function handleAbsentPlayer(){
+  const sel=document.getElementById('absent-player-sel')?.value;
+  if(!sel||!S.current)return toast('Select a player','warn');
+  const[pid,origCourt]=sel.split('|');
+  const playerId=parseInt(pid),court=parseInt(origCourt);
+  if(!playerId||!court)return toast('Invalid selection','warn');
+  // Find player on their assigned court in current session
+  let assignedCourt=null;
+  for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(playerId)){assignedCourt=c;break;}}
+  if(assignedCourt===null)return toast('Player not assigned to any court this session','warn');
+  if(!confirm(`Remove this player from Court ${assignedCourt}? Courts below will need to cascade fill.`))return;
+  await removePlayerFromCourtNow(playerId,assignedCourt);
+}
+async function markPlayerLate(){
+  if(!S.current)return toast('No session','warn');
+  const pid=parseInt(document.getElementById('late-player-sel')?.value);
+  if(!pid)return toast('Select a player','warn');
+  const lat=S.current.latePlayers||[];
+  if(lat.find(x=>x.playerId===pid))return toast('Already marked late','warn');
+  let originalCourt=null;
+  for(let c=1;c<=NC;c++){
+    if((S.current.assignments[c]||[]).includes(pid)){originalCourt=c;break;}
+  }
+  if(!originalCourt)return toast('Player not assigned','warn');
+  const lastCourt=6;
+  const a=S.current.assignments;
+  for(let c=1;c<=NC;c++)a[c]=(a[c]||[]).filter(id=>id!==pid);
+  if(!a[lastCourt])a[lastCourt]=[];
+  a[lastCourt].push(pid);
+  lat.push({playerId:pid,originalCourt});
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();toast('Player marked late','success');
+}
+async function distributeBirds(){
+  if(!S.current)return toast('No session','warn');
+  const bd={};
+  for(let c=1;c<=NC;c++){
+    const cnt=parseInt(document.getElementById(`birds_${c}`)?.value)||0;
+    if(cnt>0){
+      const pids=S.current.assignments[c]||[];
+      if(pids.length>0)bd[c]={playerId:pids[0],birdsReceived:cnt};
+    }
+  }
+  S.current.birdDistribution=bd;
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();toast('Birds distributed!','success');
+}
+
+// ══════════════════════════════════════════════
+// ATTENDANCE
+// ══════════════════════════════════════════════
+function renderAttendanceList(){
+  if(!S.current)return '<div style="color:var(--muted);font-size:12px;">No active session</div>';
+  const att=S.current.attendance||{};
+  // Show all players assigned to this session
+  const assignedIds=new Set();
+  for(let c=1;c<=NC;c++)(S.current.assignments[c]||[]).forEach(id=>assignedIds.add(id));
+  const attendees=S.players.filter(p=>assignedIds.has(p.id)||att[p.id]);
+  if(!attendees.length)return '<div style="color:var(--muted);font-size:12px;">No players assigned to this session yet</div>';
+  return attendees.map(p=>{
+    const status=att[p.id]||'unmarked';
+    return `<div class="att-row">
+      <div style="flex:1;font-weight:700;font-size:13px;">${esc(p.name)}<span style="font-size:10px;color:var(--muted);margin-left:6px;">(${p.noShowCount} absences)</span></div>
+      <button class="att-btn ${status==='present'?'att-present':'att-unmarked'}" onclick="markAttendance(${p.id},'present')">✓ Present</button>
+      <button class="att-btn ${status==='absent'?'att-absent':'att-unmarked'}" onclick="markAttendance(${p.id},'absent')">✕ Absent</button>
+    </div>`;
+  }).join('');
+}
+function markAttendance(playerId,status){
+  if(!S.current)return;
+  if(!S.current.attendance)S.current.attendance={};
+  S.current.attendance[playerId]=status;
+  // Re-render attendance list in place
+  const el=document.getElementById('attendance-list');
+  if(el)el.innerHTML=renderAttendanceList();
+}
+async function saveAttendance(){
+  if(!S.current)return toast('No active session','warn');
+  await setKV('current_session',S.current);
+  toast('Attendance saved!','success');
+}
+
+// ══════════════════════════════════════════════
+// Q&A SYSTEM
+// ══════════════════════════════════════════════
+async function submitQuestion(){
+  const email=localStorage.getItem('dcbc-email');
+  const me=S.players.find(p=>p.email.toLowerCase()===(email||'').toLowerCase());
+  if(!me||!me.approved)return toast('Must be registered and approved','warn');
+  const qtext=g('qa-input').trim();if(!qtext){toast('Enter your question','warn');return;}
+  const questions=await getKV('qa_questions')||[];
+  questions.push({id:Date.now(),playerName:me.name,playerEmail:me.email,question:qtext,answer:null,ts:new Date().toISOString()});
+  await setKV('qa_questions',questions);
+  S.qaQuestions=questions;
+  document.getElementById('qa-input').value='';
+  renderAll();toast('Question submitted!','success');
+}
+async function answerQuestion(id){
+  const ans=prompt('Enter your answer:');if(!ans||!ans.trim())return;
+  const questions=await getKV('qa_questions')||[];
+  const q=questions.find(x=>x.id===id);if(!q)return;
+  q.answer=ans.trim();q.answeredAt=new Date().toISOString();
+  await setKV('qa_questions',questions);
+  S.qaQuestions=questions;
+  renderAll();toast('Answer posted!','success');
+}
+async function deleteQuestion(id){
+  if(!confirm('Delete this question?'))return;
+  let questions=await getKV('qa_questions')||[];
+  questions=questions.filter(q=>q.id!==id);
+  await setKV('qa_questions',questions);
+  S.qaQuestions=questions;
+  renderAll();toast('Deleted','warn');
+}
+function renderQA(){
+  const el=document.getElementById('sec-qa');if(!el)return;
+  const questions=S.qaQuestions||[];
+  const email=localStorage.getItem('dcbc-email');
+  let html='';
+  // Question input box (only for approved players)
+  const me=S.players.find(p=>p.email.toLowerCase()===(email||'').toLowerCase());
+  if(me&&me.approved){
+    html+=`<div class="card"><div class="card-title">❓ Ask a Question</div>
+      <textarea class="inp" id="qa-input" placeholder="Ask anything about the league, rules, schedule..." style="min-height:70px;"></textarea>
+      <button class="btn btn-primary" onclick="submitQuestion()">Submit Question</button>
+    </div>`;
+  }
+  if(!questions.length){html+='<div class="empty-state"><div class="ei">❓</div><div class="em">No questions yet — be the first to ask!</div></div>';el.innerHTML=html;return;}
+  // Show all questions newest first
+  [...questions].reverse().forEach(q=>{
+    const isOwn=q.playerEmail===email;
+    html+=`<div class="qa-card">
+      <div class="qa-q">${esc(q.question)}</div>
+      <div class="qa-meta">Asked by ${adminUnlocked?esc(q.playerName):'a player'} · ${new Date(q.ts).toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</div>
+      ${q.answer?`<div class="qa-ans"><strong>Admin:</strong> ${esc(q.answer)}</div>`:'<div class="qa-unanswered">⏳ Awaiting admin response</div>'}
+      ${adminUnlocked?`<div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="answerQuestion(${q.id})">${q.answer?'Edit Answer':'Answer'}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">Delete</button>
+      </div>`:''}
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+init();
+</script>
+</body>
+</html>
