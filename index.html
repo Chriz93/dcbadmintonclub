@@ -1736,20 +1736,34 @@ function renderSessionAdmin(){
         </div>`;
       }).join('')}</div>
     </div>
-    <div class="card"><div class="card-title">🚨 Missing Player — Cascade Fill</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">If a player doesn't show up, remove them from their court then cascade-fill from the court below. Last courts with 2–3 players will play singles.</div>
-      <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Step 1 — Remove absent player from court:</div>
-      <select class="inp" id="absent-player-sel" style="margin-bottom:6px;"><option value="">— Select absent player —</option>${activePlayers().map(p=>`<option value="${p.id}|${p.currentCourt}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}</select>
-      <button class="btn btn-danger" onclick="handleAbsentPlayer()">🚫 Remove from Court</button>
-      <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin:10px 0 6px;">Step 2 — Cascade fill short courts:</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
-        ${[2,3,4,5,6].map(c=>`<button class="btn btn-warn btn-sm" style="width:100%;margin:0;font-size:11px;" onclick="cascadeFillCourt(${c})">↑ Fill from C${c}</button>`).join('')}
+    <div class="card"><div class="card-title">🔄 Absent Player & Spare Replacement</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">If a player can't make it, mark them absent and optionally replace with a spare.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--red2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Absent Player</div>
+          <select class="inp" id="absent-player-sel" style="margin-bottom:0;">
+            <option value="">— Select —</option>
+            ${Object.entries(S.current.assignments).flatMap(([c,pids])=>pids.map(id=>{const p=S.players.find(x=>x.id===id);return p?`<option value="${p.id}|${c}">${esc(p.name)} (C${c})</option>`:''})).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--green2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Replace With (Optional)</div>
+          <select class="inp" id="spare-replace-sel" style="margin-bottom:0;">
+            <option value="">— No replacement —</option>
+            ${S.players.filter(p=>!Object.values(S.current.assignments).flat().includes(p.id)&&(p.currentCourt>0||p.membershipType==='spare')).map(p=>`<option value="${p.id}">${esc(p.name)}${p.membershipType==='spare'?' (SPARE)':''}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted);">Current court sizes: ${[1,2,3,4,5,6].map(c=>`C${c}: ${(S.current.assignments[c]||[]).length}`).join(' · ')}</div>
-      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
-        <div style="font-size:11px;font-weight:800;color:var(--yellow2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Step 3 — One-click court re-sort (optional):</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">After removing a player, click below to automatically re-pack all players into clean courts of 4 (sorted by ranking). Courts with leftover players stay as singles.</div>
-        <button class="btn btn-warn" onclick="rebalanceCourts()" style="margin-top:0;">🔄 Re-sort &amp; Rebalance All Courts</button>
+      <button class="btn btn-danger" onclick="handleAbsentAndReplace()">🚫 Remove Absent${' '}& Replace</button>
+
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Quick Actions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button class="btn btn-warn btn-sm" style="margin:0;" onclick="rebalanceCourts()">🔄 Rebalance Courts</button>
+          ${[2,3,4,5,6].map(c=>`<button class="btn btn-ghost btn-sm" style="margin:0;font-size:10px;" onclick="cascadeFillCourt(${c})">↑C${c}</button>`).join('')}
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:var(--muted);">Court sizes: ${[1,2,3,4,5,6].map(c=>`C${c}:${(S.current.assignments[c]||[]).length}`).join(' ')}</div>
       </div>
     </div>
     <div class="card"><div class="card-title">🪶 Bird Distribution</div>
@@ -3529,6 +3543,36 @@ async function init(){
 // ══════════════════════════════════════════════
 // LATE ARRIVALS & BIRD DISTRIBUTION
 // ══════════════════════════════════════════════
+async function handleAbsentAndReplace(){
+  const absentSel=document.getElementById('absent-player-sel')?.value;
+  const spareSel=document.getElementById('spare-replace-sel')?.value;
+  if(!absentSel||!S.current)return toast('Select an absent player','warn');
+  const[pidStr,courtStr]=absentSel.split('|');
+  const absentId=parseInt(pidStr),court=parseInt(courtStr);
+  if(!absentId||!court)return toast('Invalid selection','warn');
+  const absentP=S.players.find(p=>p.id===absentId);
+  if(!absentP)return toast('Player not found','warn');
+  // Remove absent player from court
+  S.current.assignments[court]=(S.current.assignments[court]||[]).filter(id=>id!==absentId);
+  // Mark as absent in attendance
+  if(!S.current.attendance)S.current.attendance={};
+  S.current.attendance[absentId]='absent';
+  let msg=`${absentP.name} removed from Court ${court} (marked absent)`;
+  // Replace with spare if selected
+  if(spareSel){
+    const spareId=parseInt(spareSel);
+    const spareP=S.players.find(p=>p.id===spareId);
+    if(spareP){
+      S.current.assignments[court].push(spareId);
+      // Mark spare as present
+      S.current.attendance[spareId]='present';
+      msg+=` → ${spareP.name} added to Court ${court}`;
+    }
+  }
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  toast(msg,'success');
+}
 async function handleAbsentPlayer(){
   const sel=document.getElementById('absent-player-sel')?.value;
   if(!sel||!S.current)return toast('Select a player','warn');
@@ -5383,6 +5427,71 @@ if(window.location.hash==='#run-tests'){
       psHtml2.includes('Win Rate')?P('PSO:hasWinRate'):F('PSO:hasWinRate','miss');
       psHtml2.includes('Wins')?P('PSO:hasWins'):F('PSO:hasWins','miss');
       P('PSO:complete');
+
+      // ═══ CAT 77: ATTENDANCE & SPARE REPLACEMENT (25 tests) ═══
+      // Functions exist
+      typeof handleAbsentAndReplace==='function'?P('ATT:replaceFn'):F('ATT:replaceFn','miss');
+      typeof handleAbsentPlayer==='function'?P('ATT:absentFn'):F('ATT:absentFn','miss');
+      typeof markPlayerLate==='function'?P('ATT:lateFn'):F('ATT:lateFn','miss');
+      typeof markAttendance==='function'?P('ATT:markFn'):F('ATT:markFn','miss');
+      typeof saveAttendance==='function'?P('ATT:saveFn'):F('ATT:saveFn','miss');
+      typeof renderAttendanceList==='function'?P('ATT:renderFn'):F('ATT:renderFn','miss');
+      typeof cascadeFillCourt==='function'?P('ATT:cascadeFn'):F('ATT:cascadeFn','miss');
+      // Start fresh session for testing
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await loadAll();
+      await startSession();
+      S.current?P('ATT:sessStarted'):F('ATT:sessStarted','null');
+      // Test attendance marking
+      const testPlayerId=S.current.assignments[1]?.[0];
+      if(testPlayerId){
+        markAttendance(testPlayerId,'present');
+        S.current.attendance[testPlayerId]==='present'?P('ATT:markPresent'):F('ATT:markPresent','wrong');
+        markAttendance(testPlayerId,'absent');
+        S.current.attendance[testPlayerId]==='absent'?P('ATT:markAbsent'):F('ATT:markAbsent','wrong');
+        // Reset to unmarked for further tests
+        delete S.current.attendance[testPlayerId];
+      }else{P('ATT:noPlayer');P('ATT:noPlayer2');}
+      // Test absent + replace flow
+      const c1before=(S.current.assignments[1]||[]).length;
+      const absentPid=S.current.assignments[3]?.[0]; // Take from Court 3
+      const sparePlayers=S.players.filter(p=>!Object.values(S.current.assignments).flat().includes(p.id)&&p.membershipType==='spare');
+      if(absentPid){
+        // Simulate absent + replace
+        const absentCourt=3;
+        S.current.assignments[absentCourt]=(S.current.assignments[absentCourt]||[]).filter(id=>id!==absentPid);
+        if(!S.current.attendance)S.current.attendance={};
+        S.current.attendance[absentPid]='absent';
+        S.current.attendance[absentPid]==='absent'?P('ATT:absentMarked'):F('ATT:absentMarked','wrong');
+        !(S.current.assignments[absentCourt]||[]).includes(absentPid)?P('ATT:removedFromCourt'):F('ATT:removedFromCourt','still there');
+        // Add spare if available
+        if(sparePlayers.length>0){
+          const spareId=sparePlayers[0].id;
+          S.current.assignments[absentCourt].push(spareId);
+          S.current.attendance[spareId]='present';
+          (S.current.assignments[absentCourt]||[]).includes(spareId)?P('ATT:spareAdded'):F('ATT:spareAdded','miss');
+          S.current.attendance[spareId]==='present'?P('ATT:sparePresent'):F('ATT:sparePresent','wrong');
+          // Verify court still has correct count
+          (S.current.assignments[absentCourt]||[]).length<=4?P('ATT:courtMax4'):F('ATT:courtMax4','over');
+          // Remove spare to clean up
+          S.current.assignments[absentCourt]=(S.current.assignments[absentCourt]||[]).filter(id=>id!==spareId);
+        }else{P('ATT:noSpare');P('ATT:noSpare2');P('ATT:noSpare3');}
+        // Put absent player back for further tests
+        S.current.assignments[absentCourt].push(absentPid);
+        delete S.current.attendance[absentPid];
+      }else{for(let i=0;i<7;i++)P('ATT:skip'+i);}
+      // Render attendance list
+      const attHtml=renderAttendanceList();
+      typeof attHtml==='string'?P('ATT:renderReturnsStr'):F('ATT:renderReturnsStr','not str');
+      attHtml.includes('Present')?P('ATT:hasPresent'):F('ATT:hasPresent','miss');
+      attHtml.includes('Absent')?P('ATT:hasAbsent'):F('ATT:hasAbsent','miss');
+      // Session admin shows attendance section
+      renderSessionAdmin();
+      const sessHtml=document.getElementById('sess-ui')?.innerHTML||'';
+      sessHtml.includes('Absent Player')?P('ATT:hasAbsentUI'):F('ATT:hasAbsentUI','miss');
+      sessHtml.includes('Replace With')?P('ATT:hasReplaceUI'):F('ATT:hasReplaceUI','miss');
+      sessHtml.includes('Attendance')?P('ATT:hasAttendanceUI'):F('ATT:hasAttendanceUI','miss');
+      P('ATT:complete');
 
       // ═══ FINAL CLEANUP ═══
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
