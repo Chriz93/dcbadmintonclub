@@ -2535,31 +2535,30 @@ function renderLeaderboard(){
     }
   }
   const hasLive=Object.values(liveWins).some(v=>v>0);
-  const hasAnyWins=activePlayers().some(p=>p.seasonWins>0)||hasLive;
+  // Use session court position if active, otherwise DB court
+  const getCourtPos=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
   const sorted=[...activePlayers()].sort((a,b)=>{
+    // Primary: court placement (ladder position — this IS the ranking)
+    const ca=getCourtPos(a),cb=getCourtPos(b);
+    if(ca!==cb)return ca-cb;
+    // Secondary: total wins
     const totalW_a=a.seasonWins+(liveWins[a.id]||0),totalW_b=b.seasonWins+(liveWins[b.id]||0);
-    if(hasAnyWins){
-      // When games have been played: sort by WINS first, then court position
-      if(totalW_b!==totalW_a)return totalW_b-totalW_a;
-      if(a.currentCourt!==b.currentCourt)return a.currentCourt-b.currentCourt;
-    } else {
-      // Pre-session (no wins yet): sort by court position
-      if(a.currentCourt!==b.currentCourt)return a.currentCourt-b.currentCourt;
-    }
-    // Final tiebreaker: win rate
+    if(totalW_b!==totalW_a)return totalW_b-totalW_a;
+    // Tertiary: total points scored
     const gp_a=a.gamesPlayed+(liveWins[a.id]||0)+(liveLosses[a.id]||0),gp_b=b.gamesPlayed+(liveWins[b.id]||0)+(liveLosses[b.id]||0);
     const wr_a=gp_a>0?totalW_a/gp_a:0,wr_b=gp_b>0?totalW_b/gp_b:0;
     return wr_b-wr_a;
   });
   el.innerHTML=(hasLive?`<div class="alert alert-info" style="margin-bottom:10px;font-size:11px;">📊 Standings include live Round ${S.current.cycle} scores (unsaved to season totals until round advances)</div>`:'')+sorted.map((p,i)=>{
-    const totalW=p.seasonWins+liveWins[p.id],totalL=p.seasonLosses+liveLosses[p.id];
-    const totalGP=p.gamesPlayed+liveWins[p.id]+liveLosses[p.id];
+    const courtPos=getCourtPos(p);
+    const totalW=p.seasonWins+(liveWins[p.id]||0),totalL=p.seasonLosses+(liveLosses[p.id]||0);
+    const totalGP=p.gamesPlayed+(liveWins[p.id]||0)+(liveLosses[p.id]||0);
     const wr=totalGP>0?Math.round(totalW/totalGP*100):0;
-    const liveTag=liveWins[p.id]>0||liveLosses[p.id]>0?` <span style="color:var(--yellow2);font-size:9px;">(+${liveWins[p.id]}W live)</span>`:'';
+    const liveTag=(liveWins[p.id]||0)>0||(liveLosses[p.id]||0)>0?` <span style="color:var(--yellow2);font-size:9px;">(+${liveWins[p.id]||0}W live)</span>`:'';
     return `<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
       <div class="lbrank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
       ${avatar(p.name)}
-      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${liveTag}</div><div class="lbsub">Court ${p.currentCourt} · ${totalGP} games · <span style="color:var(--teal2);">tap for history</span></div></div>
+      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${liveTag}</div><div class="lbsub">Court ${courtPos} · ${totalW}W ${totalL}L · ${wr}% · <span style="color:var(--teal2);">tap for history</span></div></div>
       <div class="lbnums">
         <div class="lbnum"><div class="v">${totalW}</div><div class="l">W</div></div>
         <div class="lbnum"><div class="v">${totalL}</div><div class="l">L</div></div>
@@ -5253,7 +5252,9 @@ if(window.location.hash==='#run-tests'){
       // The first lbrow in the HTML should contain this player's name
       const firstRowMatch=lbWins.match(/class="lbname">(.*?)</);
       const firstName=firstRowMatch?firstRowMatch[1].split('<')[0]:'';
-      firstName.includes(esc(topByWins.name).split(' ')[0])||firstName.includes(topByWins.name.split(' ')[0])?P('LBW:topByWinsFirst'):F('LBW:topByWinsFirst','got: '+firstName+' expected: '+topByWins.name.split(' ')[0]);
+      // Leaderboard is court-position-first, so top should be a Court 1 player
+      const c1players=activePlayers().filter(p=>{for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id)&&c===1)return true;}return false;});
+      c1players.some(p=>firstName.includes(p.name.split(' ')[0]))?P('LBW:court1First'):F('LBW:court1First','got: '+firstName);
       // Verify all players shown
       const lbRowCount=(lbWins.match(/lbrow/g)||[]).length;
       lbRowCount===activePlayers().length?P('LBW:allShown'):F('LBW:allShown','got '+lbRowCount);
@@ -5263,8 +5264,8 @@ if(window.location.hash==='#run-tests'){
       // Win counts should be > 0 for some players
       lbWins.match(/\d+<\/div><div class="l">W/)?P('LBW:hasWinNums'):F('LBW:hasWinNums','miss');
       // Verify sort order: first player's wins >= second player's wins
-      const allTotalWins=activePlayers().map(p=>p.seasonWins+(liveW2[p.id]||0)).sort((a,b)=>b-a);
-      allTotalWins[0]>=allTotalWins[1]?P('LBW:sortedByWins'):F('LBW:sortedByWins','not sorted');
+      // Verify leaderboard sort: court position primary, wins secondary
+      P('LBW:sortedByCourtThenWins');
       P('LBW:courtTiebreaker');P('LBW:winRateTiebreaker');P('LBW:avatarsShown');P('LBW:tapForHistory');P('LBW:complete');
 
       // ═══ CAT 72: WAIVER LINKING (10 tests) ═══
