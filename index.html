@@ -494,15 +494,12 @@ textarea.inp{resize:vertical;min-height:80px;}
           <h4>12. Consent &amp; Agreement</h4>
           <p>By checking the boxes below and entering my digital signature, I confirm I have read, understood, and fully agree to all terms of this Liability Waiver, Activity Release, and Payment Policy. I understand this is a voluntary private recreational arrangement. This constitutes a binding digital agreement between me and Christy George (individual organizer).</p>
         </div>
-        <div class="chk-row"><input type="checkbox" id="w1"><span>I have read and agree to all OCDSB facility rules, safety guidelines, and conduct standards</span></div>
-        <div class="chk-row"><input type="checkbox" id="w2"><span>ALL FEES ARE NON-REFUNDABLE under any circumstances — no exceptions for illness, weather, cancellations, or schedule conflicts</span></div>
-        <div class="chk-row"><input type="checkbox" id="w3"><span>I release DC Badminton Club, its organizers, volunteers, and OCDSB from any and all claims arising from my participation</span></div>
-        <div class="chk-row"><input type="checkbox" id="w4"><span>I am physically fit with no medical conditions preventing safe participation; if medical concerns exist, I have physician clearance</span></div>
-        <div class="chk-row"><input type="checkbox" id="w7"><span>I understand my e-transfer is my responsibility to confirm — unconfirmed or rejected payments mean my registration is incomplete</span></div>
-        <div class="chk-row"><input type="checkbox" id="w8"><span>I consent to photos/videos taken during sessions being used by DC Badminton Club for promotional purposes, and agree to the collection of my personal information for league administration only</span></div>
-        <div class="chk-row"><input type="checkbox" id="w9"><span>I confirm I am <strong>18 years of age or older</strong>. I understand this is an adult recreational league and participation by minors requires separate written guardian consent arranged with the organizer</span></div>
-        <div class="chk-row" id="w5-row" style="display:none;"><input type="checkbox" id="w5"><span>I have made the e-transfer payment of <strong>$150</strong> to <strong>christygeorge993@gmail.com</strong></span></div>
-        <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$24.50 per session</strong> each time I am called in to play. This fee is due before or on the session date via e-transfer to <strong>christygeorge993@gmail.com</strong></span></div>
+        <div class="chk-row" style="background:rgba(0,153,204,0.08);border:1px solid rgba(0,153,204,0.3);border-radius:8px;padding:10px 12px;">
+          <input type="checkbox" id="w1">
+          <span style="font-weight:700;">I have read and agree to <strong>all sections above</strong> including: liability waiver & release, assumption of risk, OCDSB facility rules, non-refundable payment policy, media consent, privacy policy, e-transfer responsibility, and I confirm I am <strong>18 years of age or older</strong>.</span>
+        </div>
+        <div class="chk-row" id="w5-row" style="display:none;"><input type="checkbox" id="w5"><span>I acknowledge the e-transfer payment of <strong>$150</strong> to <strong>christygeorge993@gmail.com</strong> is required to complete my registration.</span></div>
+        <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$24.50 per session</strong> via e-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</span></div>
         <label class="lbl" style="margin-top:8px;">Digital Signature (type full name) *</label>
         <input class="inp" id="r-sig" placeholder="Your full name as signature">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">⚠️ By typing your name you confirm this is a legally binding digital signature</div>
@@ -2693,11 +2690,11 @@ function regStep1(){
   goRS(2);
 }
 async function regStep2(){
-  const checkboxes=['w1','w2','w3','w4','w7','w8','w9'];
+  const checkboxes=['w1'];
   if(regData.membershipType==='regular')checkboxes.push('w5');
   else checkboxes.push('w6');
   if(!checkboxes.every(id=>document.getElementById(id)?.checked)){
-    toast(regData.membershipType==='spare'?'Check all boxes including the per-session fee acknowledgment':'Check all required boxes','warn');return;
+    toast('Please check all required boxes to continue','warn');return;
   }
   const sig=g('r-sig').trim();if(!sig){toast('Enter digital signature','warn');return;}
   regData.waiverSig=sig;goRS(3);
