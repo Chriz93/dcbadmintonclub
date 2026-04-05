@@ -2615,15 +2615,20 @@ function renderRankings(){
   el.innerHTML=html;
 }
 function computePlayerStreakAndImprovement(){
-  // Returns {playerId: {streak, maxStreak, improvement, totalAbsences}}
+  // Returns {playerId: {streak, maxStreak, courtClimb, improvement}}
+  // Includes BOTH completed sessions AND current active session data
   const result={};
+  // Combine completed sessions + current session (if active) for full picture
+  const allSessions=[...S.sessions];
+  if(S.current&&S.current.movements&&S.current.movements.length>0){
+    allSessions.push(S.current); // include active session data
+  }
   S.players.forEach(p=>{
     let cur=0,max=0;
-    S.sessions.forEach(s=>{
+    allSessions.forEach(s=>{
       let sessWins=0,sessTotalGames=0;
       (s.movements||[]).forEach(m=>{
         const pw=m.wins?.[p.id]||0;
-        // Count actual games this player participated in from score data
         let playerGames=0;
         for(let c=1;c<=NC;c++){
           const pids=s.assignments?.[c]||[];
@@ -2641,14 +2646,19 @@ function computePlayerStreakAndImprovement(){
       if(sessTotalGames>0&&sessWins>sessTotalGames/2){cur++;max=Math.max(max,cur);}
       else if(sessTotalGames>0){cur=0;}
     });
-    // Court climb/drop: only count if sessions have been completed
-    // Use the first session's assignments to find actual starting court
-    let startCourt=p.currentCourt; // default: no change
-    if(S.sessions.length>0){
-      const firstSess=S.sessions[0];
+    // Court climb/drop: compare starting court vs current court
+    // Starting court = where player was in the FIRST session (or first round of current session)
+    let startCourt=p.currentCourt;
+    if(allSessions.length>0){
+      const firstSess=allSessions[0];
       for(let c=1;c<=NC;c++){if((firstSess.assignments?.[c]||[]).includes(p.id)){startCourt=c;break;}}
     }
-    const courtClimb=S.sessions.length>0?startCourt-p.currentCourt:0; // positive=climbed, negative=dropped
+    // Current position: use actual court assignments from active session if available
+    let currentPos=p.currentCourt;
+    if(S.current){
+      for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id)){currentPos=c;break;}}
+    }
+    const courtClimb=allSessions.length>0?startCourt-currentPos:0;
     result[p.id]={streak:cur,maxStreak:max,courtClimb,improvement:Math.max(0,courtClimb)};
   });
   return result;
@@ -2684,14 +2694,32 @@ function renderPlayerStats(){
     if(p.id===longestStreakId&&sd.maxStreak>0)awards.push('🔥');
     if(p.id===mostImprovedId&&(sd.courtClimb||0)>0)awards.push('📈');
     if(p.id===mostConsistentId)awards.push('🏅');
+    // Include live round wins/losses if session active
+    let lw=0,ll=0;
+    if(S.current){
+      const scy=S.current.cycle;
+      for(let c=1;c<=NC;c++){
+        for(let g2=1;g2<=NG;g2++){
+          const sc=S.current.scores[`c${c}_y${scy}_g${g2}`];if(!sc)continue;
+          const sa=[sc.a1,sc.a2].filter(x=>x!=null),sb=[sc.b1,sc.b2].filter(x=>x!=null);
+          if(sc.w==='A'){if(sa.includes(p.id))lw++;if(sb.includes(p.id))ll++;}
+          else if(sc.w==='B'){if(sb.includes(p.id))lw++;if(sa.includes(p.id))ll++;}
+        }
+      }
+    }
+    const totalW=p.seasonWins+lw,totalL=p.seasonLosses+ll,totalGP=p.gamesPlayed+lw+ll;
+    const liveWr=totalGP>0?Math.round(totalW/totalGP*100):wr;
+    // Find current court in session (may differ from DB during active session)
+    let displayCourt=p.currentCourt;
+    if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id)){displayCourt=c;break;}}}
     return `<div class="card"><div class="flex-between" style="margin-bottom:10px;">
       <div style="font-weight:800;font-size:15px;">${esc(p.name)}${awards.length?` <span style="font-size:14px;">${awards.join('')}</span>`:''}</div>
-      <span class="tag tg-teal">Court ${p.currentCourt}</span></div>
+      <span class="tag tg-teal">Court ${displayCourt}</span></div>
       <div class="sgrid">
-        <div class="sbox"><div class="sv">${p.seasonWins}</div><div class="sl">Wins</div></div>
-        <div class="sbox"><div class="sv">${p.seasonLosses}</div><div class="sl">Losses</div></div>
-        <div class="sbox"><div class="sv">${wr}%</div><div class="sl">Win Rate</div></div>
-        <div class="sbox"><div class="sv">C${p.highestCourt}</div><div class="sl">Best Court</div></div>
+        <div class="sbox"><div class="sv">${totalW}</div><div class="sl">Wins${lw>0?' <span style="color:var(--yellow2);font-size:8px;">(+'+lw+' live)</span>':''}</div></div>
+        <div class="sbox"><div class="sv">${totalL}</div><div class="sl">Losses${ll>0?' <span style="color:var(--yellow2);font-size:8px;">(+'+ll+' live)</span>':''}</div></div>
+        <div class="sbox"><div class="sv">${liveWr}%</div><div class="sl">Win Rate</div></div>
+        <div class="sbox"><div class="sv">C${Math.min(displayCourt,p.highestCourt||displayCourt)}</div><div class="sl">Best Court</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;">
         <div>🔥 Current streak: <strong>${sd.streak||0}</strong></div>
