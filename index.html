@@ -922,7 +922,8 @@ async function loadAll(){
   }catch(e){return false;}
 }
 
-function startSync(){setInterval(async()=>{setSS('syncing');await loadAll();renderAll();setSS('ok');},3000);}
+let _isSyncing=false;
+function startSync(){setInterval(async()=>{_isSyncing=true;setSS('syncing');await loadAll();renderAll();setSS('ok');_isSyncing=false;},3000);}
 function setSS(s){const d=document.getElementById('sdot'),l=document.getElementById('slbl');if(!d)return;d.className='sdot'+(s==='syncing'?' syncing':s==='err'?' err':'');l.textContent=s==='syncing'?'Syncing':s==='err'?'Offline':'Live';}
 
 // ══════════════════════════════════════════════
@@ -1927,10 +1928,10 @@ function renderScoreEntry(){
     html+=`<div class="game-block"><div class="glabel">${t} <span style="font-size:10px;color:var(--muted);font-weight:400;">${md}</span> ${saved?'<span class="saved-pill">✓ Saved</span>':''}</div>
       <div class="grow">
         <div class="tcol"><div class="tnames">${esc(ta)}</div>
-          <input type="text" class="sinp ${saved&&saved.w==='A'?'win':saved?'lose':''}" id="si_${court}_${g}_a" maxlength="2" value="${saved?saved.sA:''}" placeholder="0" onchange="liveW(${court},${g})" onblur="liveW(${court},${g})" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></div>
+          <input type="text" class="sinp ${saved&&saved.w==='A'?'win':saved?'lose':''}" id="si_${court}_${g}_a" maxlength="2" value="${saved?saved.sA:''}" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,'');liveW(${court},${g})" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></div>
         <div class="vs">VS</div>
         <div class="tcol"><div class="tnames">${esc(tb)}</div>
-          <input type="text" class="sinp ${saved&&saved.w==='B'?'win':saved?'lose':''}" id="si_${court}_${g}_b" maxlength="2" value="${saved?saved.sB:''}" placeholder="0" onchange="liveW(${court},${g})" onblur="liveW(${court},${g})" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></div>
+          <input type="text" class="sinp ${saved&&saved.w==='B'?'win':saved?'lose':''}" id="si_${court}_${g}_b" maxlength="2" value="${saved?saved.sB:''}" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,'');liveW(${court},${g})" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></div>
       </div><div id="wr_${court}_${g}" style="text-align:center;min-height:22px;margin-top:6px;"></div>
       <button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%;" onclick="saveGameScore(${court},${g})">💾 Save Game ${g}</button>
     </div>`;
@@ -2423,7 +2424,8 @@ function renderAll(){
   renderLeaderboard();renderPlayerStats();renderHeatmap();renderHistory();renderRSVP();renderQA();
   renderPOS('pos-standings');
   if(adminUnlocked){renderAdminPlayers();renderRegPlayers();renderSessionAdmin();renderAssignUI();renderPayments();renderAnnouncementsAdmin();}
-  const sel=document.getElementById('sc-sel');if(sel&&sel.value)renderScoreEntry();
+  // Skip score re-render during background sync to preserve unsaved input values
+  if(!_isSyncing){const sel=document.getElementById('sc-sel');if(sel&&sel.value)renderScoreEntry();}
 }
 
 // ══════════════════════════════════════════════
