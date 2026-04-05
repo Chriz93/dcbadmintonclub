@@ -1243,9 +1243,11 @@ function renderAdminPlayers(){
 
 function renderRegPlayers(){
   const el=document.getElementById('sec-a-reg');if(!el)return;
-  const waitlisted=S.players.filter(p=>p.waiverSigned&&p.waitlisted);
-  const pending=S.players.filter(p=>p.waiverSigned&&!p.approved&&!p.waitlisted);
-  const approved=S.players.filter(p=>p.waiverSigned&&p.approved&&!p.waitlisted);
+  // Only show players who self-registered (exclude admin-added players with sig='admin')
+  const selfReg=S.players.filter(p=>p.sig&&p.sig!=='admin');
+  const waitlisted=selfReg.filter(p=>p.waitlisted);
+  const pending=selfReg.filter(p=>!p.approved&&!p.waitlisted);
+  const approved=selfReg.filter(p=>p.approved&&!p.waitlisted);
   const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
   const spareCount=S.players.filter(p=>p.membershipType==='spare').length;
   let html=`<div class="card"><div class="card-title">📊 Summary</div>
@@ -1439,10 +1441,13 @@ async function autoAdvanceCheck(){
 }
 async function resetSession(){
   if(!S.current)return toast('No active session','warn');
-  if(!confirm('RESET this session? All scores and movements will be cleared. Players stay on their current courts.'))return;
+  if(!confirm('RESET this session? All scores, movements, and season stats from this session will be cleared.'))return;
+  // Reset all player season stats to 0 (they accumulate during applyRotation)
+  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0}));
+  if(resets.length)await Promise.all(resets);
   S.current.cycle=1;S.current.scores={};S.current.movements=[];S.current.courtCycles=null;
   S.current.attendance={};S.current.latePlayers=[];S.current.birdDistribution={};
-  await setKV('current_session',S.current);await loadAll();renderAll();toast('Session reset to Round 1','success');
+  await setKV('current_session',S.current);await loadAll();renderAll();toast('Session reset — all scores and stats cleared','success');
 }
 async function nextCycle(){
   if(!S.current)return toast('No active session','warn');
@@ -1585,7 +1590,15 @@ async function endSession(){
   await setKV('current_session',null);
   await loadAll();renderAll();toast('Session saved! 🏸','success');
 }
-async function cancelSession(){if(!confirm('Cancel session? All scores lost.'))return;await setKV('current_session',null);await loadAll();renderAll();}
+async function cancelSession(){
+  if(!confirm('Cancel session? All scores and stats from this session will be lost.'))return;
+  // Reset player season stats accumulated during this session
+  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0}));
+  if(resets.length)await Promise.all(resets);
+  await setKV('current_session',null);
+  // Also clear completed sessions if this was the only one
+  await loadAll();renderAll();toast('Session cancelled — stats cleared','success');
+}
 
 // ── Cascade fill: when a player is absent, promote top player from court below ──
 async function cascadeFillCourt(fromCourt){
@@ -2820,11 +2833,11 @@ function renderRegPage(){
           <div class="divider"></div>
           <div style="font-size:12px;">Membership: <strong>${isSpare?'Spare Player':'Regular Member'}</strong></div>
           <div style="font-size:12px;margin-top:4px;">Waiver: <span style="color:var(--green2);">✓ Signed</span></div>
-          ${me.approved?`<div style="font-size:12px;margin-top:4px;">Court: <strong>Court ${me.currentCourt}</strong></div>`:''}
+          ${me.approved&&me.currentCourt>0?`<div style="font-size:12px;margin-top:4px;">Court: <strong>Court ${me.currentCourt}</strong></div>`:(me.approved?'<div style="font-size:12px;margin-top:4px;color:var(--muted);">Court: <em>Pending admin assignment</em></div>':'')}
           ${!me.paid&&!isSpare?`<div class="alert alert-warn" style="margin-top:10px;">E-transfer $150 to <strong>christygeorge993@gmail.com</strong></div>`:''}
           ${isSpare&&!me.paid?`<div class="alert alert-info" style="margin-top:10px;">💡 As a spare, you pay $24.50 per session when called in. E-transfer to christygeorge993@gmail.com before or on the session date.</div>`:''}
         </div>
-        <button class="btn btn-ghost" onclick="localStorage.removeItem('dcbc-email');renderRegPage()">Register different player</button>`;
+        <button class="btn btn-ghost" onclick="localStorage.removeItem('dcbc-email');regData={};goRS(1);renderRegPage()">Register different player</button>`;
       return;
     }
   }
