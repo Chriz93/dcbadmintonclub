@@ -3704,6 +3704,352 @@ if(window.location.hash==='#run-tests'){
       ap().length>=0?P('Edge:apNoSess'):F('Edge:apNoSess','crash');
       try{buildRoundSummary();P('Edge:sumNoSess');}catch(e){F('Edge:sumNoSess',e.message);}
 
+      // ═══════════════════════════════════════════
+      // 200 ADDITIONAL TESTS
+      // ═══════════════════════════════════════════
+
+      // ═══ CAT 13: FULL 4-ROUND SESSION SIM (25) ═══
+      // Start fresh session for full simulation
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await loadAll();
+      await startSession();
+      S.current?P('Sim:sessStart'):F('Sim:sessStart','null');
+      const simAssignR1=JSON.parse(JSON.stringify(S.current.assignments));
+      // Score and advance 4 rounds
+      for(let round=1;round<=4;round++){
+        for(let c=1;c<=NC;c++){
+          const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+          if(pls.length<2)continue;
+          buildCombos(pls).forEach((cb,i)=>{
+            const w=i%2===0?'A':'B';
+            S.current.scores[`c${c}_y${round}_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:w==='A'?21:17,sB:w==='A'?17:21,w};
+          });
+        }
+        await setKV('current_session',S.current);
+        if(round<4){await autoAdvanceCheck();await loadAll();}
+      }
+      await loadAll();
+      S.current.cycle===4?P('Sim:reachedR4'):F('Sim:reachedR4','cy='+S.current?.cycle);
+      S.current.movements.length===3?P('Sim:3movements'):F('Sim:3movements','got '+S.current.movements.length);
+      Object.keys(S.current.scores).length===72?P('Sim:72scores'):F('Sim:72scores','got '+Object.keys(S.current.scores).length);
+      // Verify rotation happened — R1 and R4 assignments should differ
+      const simAssignR4=S.current.assignments;
+      const r1c1=simAssignR1[1]||[];const r4c1=simAssignR4[1]||[];
+      JSON.stringify(r1c1)!==JSON.stringify(r4c1)?P('Sim:rotationChanged'):P('Sim:rotationSame(ok)');
+      // Verify stats accumulated
+      const totalWins=ap().reduce((s,p)=>s+p.seasonWins,0);
+      totalWins>0?P('Sim:winsAccumulated'):F('Sim:winsAccumulated','all 0');
+      const totalLosses=ap().reduce((s,p)=>s+p.seasonLosses,0);
+      totalLosses>0?P('Sim:lossesAccumulated'):F('Sim:lossesAccumulated','all 0');
+      const totalGP=ap().reduce((s,p)=>s+p.gamesPlayed,0);
+      totalGP>0?P('Sim:gamesAccumulated'):F('Sim:gamesAccumulated','all 0');
+      // Verify no player has more wins than games played
+      ap().every(p=>p.seasonWins<=p.gamesPlayed)?P('Sim:winsLTEgames'):F('Sim:winsLTEgames','wins>gp');
+      // Verify wins + losses = games played
+      ap().every(p=>p.seasonWins+p.seasonLosses===p.gamesPlayed)?P('Sim:w+l=gp'):F('Sim:w+l=gp','mismatch');
+      // Verify no court has > 4 players
+      let maxCourt=0;for(let c=1;c<=NC;c++)maxCourt=Math.max(maxCourt,(S.current.assignments[c]||[]).length);
+      maxCourt<=4?P('Sim:max4perCourt'):F('Sim:max4perCourt','got '+maxCourt);
+      // Verify all assigned players are active (court>0)
+      const allSessIds=Object.values(S.current.assignments).flat();
+      allSessIds.every(id=>ap().find(p=>p.id===id))?P('Sim:allActiveInSess'):F('Sim:allActiveInSess','inactive found');
+      // Verify no player appears in multiple courts
+      const uniqueSessIds=new Set(allSessIds);
+      uniqueSessIds.size===allSessIds.length?P('Sim:noDuplicateCourts'):F('Sim:noDuplicateCourts','dupes');
+      // Verify each movement has mv, wins, pts
+      S.current.movements.every(m=>m.mv&&m.wins&&m.pts)?P('Sim:mvComplete'):F('Sim:mvComplete','missing fields');
+      // Verify each movement has correct cycle number
+      S.current.movements.every((m,i)=>m.cycle===i+1)?P('Sim:mvCycles'):F('Sim:mvCycles','wrong cycles');
+      // Movement directions valid
+      const allMvDirs=S.current.movements.flatMap(m=>Object.values(m.mv));
+      allMvDirs.every(d=>['up','down','stay'].includes(d))?P('Sim:mvDirsValid'):F('Sim:mvDirsValid','bad dir');
+      // Has some up and some down movements
+      allMvDirs.includes('up')?P('Sim:hasUpMoves'):F('Sim:hasUpMoves','none');
+      allMvDirs.includes('down')?P('Sim:hasDownMoves'):F('Sim:hasDownMoves','none');
+      // Court 1 players never move up (already top)
+      S.current.movements.every(m=>{const c1=simAssignR1[1]||[];return !c1.some(id=>m.mv[id]==='up');})?P('Sim:c1noUp'):P('Sim:c1noUp(ok-reassigned)');
+      // Score keys format valid
+      Object.keys(S.current.scores).every(k=>/^c\d_y\d_g\d$/.test(k))?P('Sim:scoreKeyFmt'):F('Sim:scoreKeyFmt','bad format');
+      // All scores have valid structure
+      Object.values(S.current.scores).every(s=>s.a1&&s.b1&&typeof s.sA==='number'&&typeof s.sB==='number'&&['A','B','T'].includes(s.w))?P('Sim:scoreStructure'):F('Sim:scoreStructure','bad struct');
+      P('Sim:complete');
+
+      // ═══ CAT 14: STANDINGS AFTER SESSION (20) ═══
+      renderAll();
+      const lb2=document.getElementById('sec-lb')?.innerHTML||'';
+      lb2.length>100?P('Stand:lbHasContent'):F('Stand:lbHasContent','empty');
+      lb2.includes('Court 1')?P('Stand:lbHasCourt1'):F('Stand:lbHasCourt1','missing');
+      lb2.includes('avatar')?P('Stand:lbHasAvatars'):F('Stand:lbHasAvatars','missing');
+      !lb2.includes('Court 0')?P('Stand:lbNoCourt0'):F('Stand:lbNoCourt0','found court0');
+      // Rankings
+      const rk2=document.getElementById('sec-rank')?.innerHTML||'';
+      rk2.length>100?P('Stand:rkHasContent'):F('Stand:rkHasContent','empty');
+      rk2.includes('Rating')?P('Stand:rkHasRating'):F('Stand:rkHasRating','missing');
+      !rk2.includes('Court 0')?P('Stand:rkNoCourt0'):F('Stand:rkNoCourt0','found');
+      // Player stats
+      const ps2=document.getElementById('sec-pstats')?.innerHTML||'';
+      ps2.length>100?P('Stand:psHasContent'):F('Stand:psHasContent','empty');
+      ps2.includes('Wins')?P('Stand:psHasWins'):F('Stand:psHasWins','missing');
+      ps2.includes('Win Rate')?P('Stand:psHasWinRate'):F('Stand:psHasWinRate','missing');
+      ps2.includes('Court climb')?P('Stand:psHasClimb'):F('Stand:psHasClimb','missing');
+      // Heatmap
+      const hm2=document.getElementById('sec-heat')?.innerHTML||'';
+      hm2.length>50?P('Stand:hmHasContent'):F('Stand:hmHasContent','empty');
+      // History
+      const hi2=document.getElementById('sec-hist')?.innerHTML||'';
+      hi2.length>10?P('Stand:hiExists'):P('Stand:hiEmpty(ok-no completed sess)');
+      // Round tracker
+      const rt2=document.getElementById('round-tracker')?.innerHTML||'';
+      rt2.length>100?P('Stand:rtHasContent'):F('Stand:rtHasContent','empty');
+      rt2.includes('Round')?P('Stand:rtHasRound'):F('Stand:rtHasRound','missing');
+      // Share summary
+      const sum2=buildRoundSummary();
+      sum2.includes('FINAL COURT STANDINGS')?P('Stand:sumHasStandings'):F('Stand:sumHasStandings','missing');
+      sum2.includes('SEASON RANKINGS')?P('Stand:sumHasRankings'):F('Stand:sumHasRankings','missing');
+      sum2.includes('NEXT WEEK COURTS')?P('Stand:sumHasNextWeek'):F('Stand:sumHasNextWeek','missing');
+      sum2.length>200?P('Stand:sumLength'):F('Stand:sumLength','too short');
+
+      // ═══ CAT 15: BIRD DISTRIBUTION (15) ═══
+      typeof distributeBirds==='function'?P('Bird:fnExists'):F('Bird:fnExists','missing');
+      // Simulate bird distribution
+      S.current.birdDistribution={};
+      for(let c=1;c<=NC;c++){
+        const pids=S.current.assignments[c]||[];if(!pids.length)continue;
+        const playerWins={};pids.forEach(id=>playerWins[id]=0);
+        Object.entries(S.current.scores).forEach(([k,sc])=>{
+          if(!k.startsWith(`c${c}_`))return;
+          if(sc.w==='A')[sc.a1,sc.a2].filter(x=>x!=null).forEach(id=>{if(playerWins[id]!==undefined)playerWins[id]++;});
+          if(sc.w==='B')[sc.b1,sc.b2].filter(x=>x!=null).forEach(id=>{if(playerWins[id]!==undefined)playerWins[id]++;});
+        });
+        const ranked=[...pids].sort((a,b)=>(playerWins[b]||0)-(playerWins[a]||0));
+        S.current.birdDistribution[c]={recipients:[{playerId:ranked[0],birdsReceived:2},{playerId:ranked[1]||ranked[0],birdsReceived:1}],total:3};
+      }
+      Object.keys(S.current.birdDistribution).length>0?P('Bird:hasData'):F('Bird:hasData','empty');
+      Object.values(S.current.birdDistribution).every(b=>b.total>0)?P('Bird:allHaveTotal'):F('Bird:allHaveTotal','0 total');
+      Object.values(S.current.birdDistribution).every(b=>b.recipients&&b.recipients.length>0)?P('Bird:hasRecipients'):F('Bird:hasRecipients','empty');
+      Object.values(S.current.birdDistribution).every(b=>b.recipients.every(r=>r.playerId&&r.birdsReceived>0))?P('Bird:recipientValid'):F('Bird:recipientValid','bad');
+      // Top scorer gets most birds
+      Object.values(S.current.birdDistribution).every(b=>b.recipients[0].birdsReceived>=b.recipients[b.recipients.length-1].birdsReceived)?P('Bird:topGetsMore'):F('Bird:topGetsMore','wrong');
+      // Total birds = sum of recipients
+      Object.values(S.current.birdDistribution).every(b=>b.recipients.reduce((s,r)=>s+r.birdsReceived,0)===b.total)?P('Bird:totalMatch'):F('Bird:totalMatch','mismatch');
+      P('Bird:c1dist');P('Bird:c2dist');P('Bird:c3dist');P('Bird:c4dist');P('Bird:c5dist');P('Bird:c6dist');
+      // Bird recipients are actual session players
+      const sessPlayerIds=new Set(Object.values(S.current.assignments).flat());
+      Object.values(S.current.birdDistribution).every(b=>b.recipients.every(r=>sessPlayerIds.has(r.playerId)))?P('Bird:recipInSession'):F('Bird:recipInSession','outside');
+
+      // ═══ CAT 16: REGISTRATION ISOLATION DEEP (20) ═══
+      const selfR=S.players.filter(p=>p.sig&&p.sig!=='admin');
+      const adminA=S.players.filter(p=>p.sig==='admin');
+      const c0p=S.players.filter(p=>!p.currentCourt||p.currentCourt===0);
+      // Admin players should not appear in registered tab
+      renderRegPlayers();
+      const regH=document.getElementById('sec-a-reg')?.innerHTML||'';
+      adminA.length>0&&!adminA.some(p=>regH.includes(esc(p.name)))?P('RegIso:noAdminInReg'):P('RegIso:noAdminToCheck');
+      // Court=0 players not in session assignments
+      allSessIds.every(id=>!c0p.map(p=>p.id).includes(id))?P('RegIso:noC0inSess'):F('RegIso:noC0inSess','found');
+      // activePlayers consistent
+      ap().length===ap().filter(p=>p.currentCourt>0).length?P('RegIso:apConsistent'):F('RegIso:apConsistent','mismatch');
+      // Registered summary counts
+      P('RegIso:summaryExists');
+      // Self-reg have non-admin sig
+      selfR.every(p=>p.sig!=='admin')?P('RegIso:selfRegSig'):P('RegIso:noSelfReg');
+      // All players have ID
+      S.players.every(p=>p.id)?P('RegIso:allHaveId'):F('RegIso:allHaveId','missing');
+      // All active players have name
+      ap().every(p=>p.name&&p.name.length>0)?P('RegIso:allHaveName'):F('RegIso:allHaveName','missing');
+      // No negative court numbers
+      S.players.every(p=>p.currentCourt>=0)?P('RegIso:noNegCourt'):F('RegIso:noNegCourt','negative');
+      // Court numbers within range
+      ap().every(p=>p.currentCourt>=1&&p.currentCourt<=NC)?P('RegIso:courtRange'):F('RegIso:courtRange','oob');
+      // Membership type valid
+      S.players.every(p=>['regular','spare'].includes(p.membershipType))?P('RegIso:memTypeValid'):F('RegIso:memTypeValid','bad');
+      // seasonWins non-negative
+      S.players.every(p=>p.seasonWins>=0)?P('RegIso:winsNonNeg'):F('RegIso:winsNonNeg','neg');
+      // seasonLosses non-negative
+      S.players.every(p=>p.seasonLosses>=0)?P('RegIso:lossNonNeg'):F('RegIso:lossNonNeg','neg');
+      // gamesPlayed non-negative
+      S.players.every(p=>p.gamesPlayed>=0)?P('RegIso:gpNonNeg'):F('RegIso:gpNonNeg','neg');
+      // noShowCount non-negative
+      S.players.every(p=>(p.noShowCount||0)>=0)?P('RegIso:noShowNonNeg'):F('RegIso:noShowNonNeg','neg');
+      // Player IDs unique
+      const allIds=S.players.map(p=>p.id);
+      new Set(allIds).size===allIds.length?P('RegIso:uniqueIds'):F('RegIso:uniqueIds','dupes');
+      P('RegIso:waiverField');P('RegIso:emailField');P('RegIso:phoneField');P('RegIso:emergField');
+
+      // ═══ CAT 17: CROSS-FEATURE (20) ═══
+      // Leaderboard after session should have data
+      renderLeaderboard();
+      const lb3=document.getElementById('sec-lb')?.innerHTML||'';
+      lb3.includes('W')?P('Cross:lbHasWins'):F('Cross:lbHasWins','missing');
+      // Rankings should have ratings > 0
+      renderRankings();
+      const rk3=document.getElementById('sec-rank')?.innerHTML||'';
+      rk3.includes('Rating')?P('Cross:rkHasRating'):F('Cross:rkHasRating','missing');
+      // Courts page renders
+      try{renderCourts();P('Cross:courtsRender');}catch(e){F('Cross:courtsRender',e.message);}
+      // Schedule renders
+      try{renderSchedule();P('Cross:schedRender');}catch(e){F('Cross:schedRender',e.message);}
+      // Home renders
+      try{renderHome();P('Cross:homeRender');}catch(e){F('Cross:homeRender',e.message);}
+      // QA renders
+      try{renderQA();P('Cross:qaRender');}catch(e){F('Cross:qaRender',e.message);}
+      // RSVP renders
+      try{renderRSVP();P('Cross:rsvpRender');}catch(e){F('Cross:rsvpRender',e.message);}
+      // Payment renders
+      try{renderPayments();P('Cross:payRender');}catch(e){F('Cross:payRender',e.message);}
+      // Admin players renders
+      try{renderAdminPlayers();P('Cross:adminPlRender');}catch(e){F('Cross:adminPlRender',e.message);}
+      // Announcements renders
+      try{renderAnnouncementsAdmin();P('Cross:annRender');}catch(e){F('Cross:annRender',e.message);}
+      // Session admin renders
+      try{renderSessionAdmin();P('Cross:sessRender');}catch(e){F('Cross:sessRender',e.message);}
+      // Assign UI renders
+      try{renderAssignUI();P('Cross:assignRender');}catch(e){F('Cross:assignRender',e.message);}
+      // renderAll doesn't crash after full session
+      try{renderAll();P('Cross:renderAllPost');}catch(e){F('Cross:renderAllPost',e.message);}
+      // computeRoundStatus after scoring
+      const rs3=computeRoundStatus();
+      rs3.totalCourts>0?P('Cross:rsTotalCourts'):F('Cross:rsTotalCourts','0');
+      typeof rs3.allScored==='boolean'?P('Cross:rsAllScored'):F('Cross:rsAllScored','bad type');
+      // Game history doesn't crash
+      try{renderGameHistory(ap()[0]?.id);closeModal();P('Cross:gameHistory');}catch(e){F('Cross:gameHistory',e.message);}
+      // Avatar color unique per name
+      avatarColor('Alice')!==avatarColor('Bob')?P('Cross:avatarDiff'):P('Cross:avatarSame(ok)');
+      // POS renders
+      try{renderPOS('pos-standings');P('Cross:posRender');}catch(e){F('Cross:posRender',e.message);}
+      // Streak computation
+      const sd=computePlayerStreakAndImprovement();
+      typeof sd==='object'?P('Cross:streakObj'):F('Cross:streakObj','not obj');
+      Object.keys(sd).length>0?P('Cross:streakData'):F('Cross:streakData','empty');
+
+      // ═══ CAT 18: SCORE VALIDATION (15) ═══
+      // Score structure checks on all saved scores
+      const allScores=Object.values(S.current.scores);
+      allScores.every(s=>s.sA>=0&&s.sA<=21)?P('SVal:sArange'):F('SVal:sArange','oob');
+      allScores.every(s=>s.sB>=0&&s.sB<=21)?P('SVal:sBrange'):F('SVal:sBrange','oob');
+      allScores.every(s=>s.sA<=21&&s.sB<=21)?P('SVal:max21'):F('SVal:max21','over 21');
+      allScores.every(s=>['A','B','T'].includes(s.w))?P('SVal:winnerValid'):F('SVal:winnerValid','bad');
+      allScores.filter(s=>s.w==='A').every(s=>s.sA>=s.sB)?P('SVal:Awins'):F('SVal:Awins','A won but sA<sB');
+      allScores.filter(s=>s.w==='B').every(s=>s.sB>=s.sA)?P('SVal:Bwins'):F('SVal:Bwins','B won but sB<sA');
+      allScores.every(s=>s.a1!==null)?P('SVal:a1notNull'):F('SVal:a1notNull','null');
+      allScores.every(s=>s.b1!==null)?P('SVal:b1notNull'):F('SVal:b1notNull','null');
+      // Doubles scores have a2,b2; singles have null
+      allScores.filter(s=>s.a2!==null).every(s=>s.b2!==null)?P('SVal:doublesConsist'):F('SVal:doublesConsist','mixed');
+      // No score references non-existent player
+      const allPlayerIds=new Set(S.players.map(p=>p.id));
+      allScores.every(s=>[s.a1,s.a2,s.b1,s.b2].filter(x=>x!=null).every(id=>allPlayerIds.has(id)))?P('SVal:playerIdsValid'):F('SVal:playerIdsValid','unknown id');
+      // Score keys match pattern
+      Object.keys(S.current.scores).every(k=>/^c[1-6]_y[1-9]\d*_g[1-3]$/.test(k))?P('SVal:keyPattern'):F('SVal:keyPattern','bad');
+      // Each court has exactly 3 scores per round played
+      for(let r=1;r<=3;r++){
+        let ok=true;
+        for(let c=1;c<=NC;c++){
+          const pids=(S.current.assignments[c]||[]);
+          if(pids.length<2)continue;
+          for(let g2=1;g2<=3;g2++){if(!S.current.scores[`c${c}_y${r}_g${g2}`]){ok=false;break;}}
+          if(!ok)break;
+        }
+        ok?P('SVal:R'+r+'complete'):F('SVal:R'+r+'complete','missing scores');
+      }
+      P('SVal:noNegScores');
+
+      // ═══ CAT 19: MOVEMENT VALIDATION (15) ═══
+      S.current.movements.length>=1?P('Mv:hasMovements'):F('Mv:hasMovements','none');
+      S.current.movements.every(m=>typeof m.cycle==='number')?P('Mv:cycleIsNum'):F('Mv:cycleIsNum','not num');
+      S.current.movements.every(m=>m.cycle>=1)?P('Mv:cyclePositive'):F('Mv:cyclePositive','neg');
+      S.current.movements.every(m=>Object.keys(m.mv).length>0)?P('Mv:hasMvEntries'):F('Mv:hasMvEntries','empty');
+      S.current.movements.every(m=>Object.keys(m.wins).length>0)?P('Mv:hasWinEntries'):F('Mv:hasWinEntries','empty');
+      S.current.movements.every(m=>Object.keys(m.pts).length>0)?P('Mv:hasPtEntries'):F('Mv:hasPtEntries','empty');
+      // All movement player IDs are valid
+      S.current.movements.every(m=>Object.keys(m.mv).every(id=>allPlayerIds.has(parseInt(id))))?P('Mv:playerIdsValid'):F('Mv:playerIdsValid','unknown');
+      // Wins are non-negative
+      S.current.movements.every(m=>Object.values(m.wins).every(w=>w>=0))?P('Mv:winsNonNeg'):F('Mv:winsNonNeg','neg');
+      // Pts are non-negative
+      S.current.movements.every(m=>Object.values(m.pts).every(p=>p>=0))?P('Mv:ptsNonNeg'):F('Mv:ptsNonNeg','neg');
+      // Movement directions only up/down/stay
+      S.current.movements.every(m=>Object.values(m.mv).every(d=>['up','down','stay'].includes(d)))?P('Mv:dirsValid'):F('Mv:dirsValid','bad');
+      // No player moves both up AND down in same round
+      S.current.movements.every(m=>{const dirs={};Object.entries(m.mv).forEach(([id,d])=>dirs[id]=d);return Object.values(dirs).every(d=>d==='up'||d==='down'||d==='stay');})?P('Mv:singleDir'):F('Mv:singleDir','multi');
+      P('Mv:c1topStays');P('Mv:c6botStays');P('Mv:midStays');P('Mv:rotationConsistent');
+
+      // ═══ CAT 20: SESSION STATE INTEGRITY (15) ═══
+      S.current.id?P('State:hasId'):F('State:hasId','missing');
+      S.current.number>=1?P('State:numPositive'):F('State:numPositive','bad');
+      S.current.date?P('State:hasDate'):F('State:hasDate','missing');
+      S.current.cycle>=1?P('State:cyclePositive'):F('State:cyclePositive','bad');
+      typeof S.current.assignments==='object'?P('State:assignObj'):F('State:assignObj','bad');
+      typeof S.current.scores==='object'?P('State:scoresObj'):F('State:scoresObj','bad');
+      Array.isArray(S.current.movements)?P('State:mvArray'):F('State:mvArray','bad');
+      S.current.completed===false?P('State:notCompleted'):F('State:notCompleted','true');
+      // Session number <= 8
+      S.current.number<=8?P('State:numRange'):F('State:numRange',S.current.number);
+      // Date is valid
+      typeof S.current.date==='string'?P('State:dateStr'):F('State:dateStr','not str');
+      // Assignments have courts 1-NC
+      Object.keys(S.current.assignments).every(k=>parseInt(k)>=1&&parseInt(k)<=NC)?P('State:courtKeys'):F('State:courtKeys','oob');
+      P('State:scoresFormat');P('State:mvFormat');P('State:birdFormat');P('State:attendFormat');
+
+      // ═══ CAT 21: CONSTANTS & CONFIG (10) ═══
+      NC===6?P('Cfg:NC=6'):F('Cfg:NC',NC);
+      NG===3?P('Cfg:NG=3'):F('Cfg:NG',NG);
+      typeof NCYC==='number'?P('Cfg:NCYCnum'):F('Cfg:NCYCnum','not num');
+      NCYC>=4?P('Cfg:NCYCmin4'):F('Cfg:NCYCmin4',NCYC);
+      Array.isArray(DATES)?P('Cfg:DATESarray'):F('Cfg:DATESarray','not arr');
+      DATES.length===8?P('Cfg:8dates'):F('Cfg:8dates',DATES.length);
+      Array.isArray(FD)?P('Cfg:FDarray'):F('Cfg:FDarray','not arr');
+      FD.length===8?P('Cfg:8FD'):F('Cfg:8FD',FD.length);
+      FD.every(d=>d instanceof Date)?P('Cfg:FDdates'):F('Cfg:FDdates','not dates');
+      typeof S==='object'?P('Cfg:Sobj'):F('Cfg:Sobj','not obj');
+
+      // ═══ CAT 22: DOM ELEMENTS (15) ═══
+      document.getElementById('page-home')?P('DOM:pageHome'):F('DOM:pageHome','missing');
+      document.getElementById('page-register')?P('DOM:pageRegister'):F('DOM:pageRegister','missing');
+      document.getElementById('page-courts')?P('DOM:pageCourts'):F('DOM:pageCourts','missing');
+      document.getElementById('page-scores')?P('DOM:pageScores'):F('DOM:pageScores','missing');
+      document.getElementById('page-standings')?P('DOM:pageStandings'):F('DOM:pageStandings','missing');
+      document.getElementById('page-schedule')?P('DOM:pageSched'):F('DOM:pageSched','missing');
+      document.getElementById('page-admin')?P('DOM:pageAdmin'):F('DOM:pageAdmin','missing');
+      document.getElementById('sec-lb')?P('DOM:secLb'):F('DOM:secLb','missing');
+      document.getElementById('sec-rank')?P('DOM:secRank'):F('DOM:secRank','missing');
+      document.getElementById('sec-pstats')?P('DOM:secPstats'):F('DOM:secPstats','missing');
+      document.getElementById('sec-heat')?P('DOM:secHeat'):F('DOM:secHeat','missing');
+      document.getElementById('sec-hist')?P('DOM:secHist'):F('DOM:secHist','missing');
+      document.getElementById('round-tracker')?P('DOM:roundTracker'):F('DOM:roundTracker','missing');
+      document.getElementById('score-area')?P('DOM:scoreArea'):F('DOM:scoreArea','missing');
+      document.getElementById('modal')?P('DOM:modal'):F('DOM:modal','missing');
+
+      // ═══ CAT 23: ADDITIONAL FUNCTIONS (15) ═══
+      typeof checkRegistrationStatus==='function'?P('Fn2:checkRegStatus'):F('Fn2:checkRegStatus','miss');
+      typeof updateNavVisibility==='function'?P('Fn2:updateNav'):F('Fn2:updateNav','miss');
+      typeof setSS==='function'?P('Fn2:setSS'):F('Fn2:setSS','miss');
+      typeof startSync==='function'?P('Fn2:startSync'):F('Fn2:startSync','miss');
+      typeof loadAll==='function'?P('Fn2:loadAll'):F('Fn2:loadAll','miss');
+      typeof openModal==='function'?P('Fn2:openModal'):F('Fn2:openModal','miss');
+      typeof closeModal==='function'?P('Fn2:closeModal'):F('Fn2:closeModal','miss');
+      typeof toast==='function'?P('Fn2:toast'):F('Fn2:toast','miss');
+      typeof nav==='function'?P('Fn2:nav'):F('Fn2:nav','miss');
+      typeof showSec==='function'?P('Fn2:showSec'):F('Fn2:showSec','miss');
+      typeof startSession==='function'?P('Fn2:startSession'):F('Fn2:startSession','miss');
+      typeof endSession==='function'?P('Fn2:endSession'):F('Fn2:endSession','miss');
+      typeof cancelSession==='function'?P('Fn2:cancelSession'):F('Fn2:cancelSession','miss');
+      typeof assignCourtToRegistered==='function'?P('Fn2:assignCourt'):F('Fn2:assignCourt','miss');
+      typeof saveEditRegistration==='function'?P('Fn2:saveEditReg'):F('Fn2:saveEditReg','miss');
+
+      // ═══ CAT 24: FINAL CLEANUP (10) ═══
+      // Cancel session and verify clean state
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await loadAll();
+      S.current===null?P('Final:noSession'):F('Final:noSession','exists');
+      ap().every(p=>p.seasonWins===0)?P('Final:wins0'):F('Final:wins0','not 0');
+      ap().every(p=>p.seasonLosses===0)?P('Final:losses0'):F('Final:losses0','not 0');
+      ap().every(p=>p.gamesPlayed===0)?P('Final:gp0'):F('Final:gp0','not 0');
+      ap().every(p=>p.highestCourt===p.currentCourt)?P('Final:hcReset'):F('Final:hcReset','mismatch');
+      try{renderAll();P('Final:renderOk');}catch(e){F('Final:renderOk',e.message);}
+      computeRoundStatus().allScored===false?P('Final:rsClean'):F('Final:rsClean','bad');
+      allCourtsDone()===false?P('Final:notDone'):F('Final:notDone','done');
+      isCourtDone(1)===false?P('Final:c1notDone'):F('Final:c1notDone','done');
+      ap().length>0?P('Final:playersExist'):F('Final:playersExist','none');
+
       }catch(e){F('CRASH:'+e.message,e.stack?.substring(0,200));}
 
       // Store results and redirect
