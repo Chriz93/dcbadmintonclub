@@ -1381,8 +1381,7 @@ function renderAnnouncementsAdmin(){
 async function startSession(){
   if(S.current)return toast('Session already active','warn');
   const n=S.sessions.length+1;if(n>8)return toast('All 8 done!','warn');
-  const cc={};for(let c=1;c<=NC;c++)cc[c]=1;
-  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,courtCycles:cc,assignments:autoAssign(),scores:{},movements:[],completed:false};
+  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,assignments:autoAssign(),scores:{},movements:[],completed:false};
   await setKV('current_session',sess);await loadAll();renderAll();toast('Session '+n+' started!','success');
 }
 function autoAssign(){
@@ -1391,178 +1390,47 @@ function autoAssign(){
   sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);a[c].push(p.id);});
   return a;
 }
-// ── Per-Court Cycle Helpers ──
+// ── Round Helpers ──
 function getCourtCycle(c){
   if(!S.current)return 1;
-  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
-  return S.current.courtCycles[c]||1;
+  return S.current.cycle||1;
 }
 function isCourtDone(c){
   if(!S.current)return false;
-  const cy=getCourtCycle(c);
+  const cy=S.current.cycle;
   const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
-  if(pids.length<2)return true; // skip courts with <2 players
+  if(pids.length<2)return true;
   const numGames=pids.length===3?3:NG;
   for(let g=1;g<=numGames;g++){if(!S.current.scores[`c${c}_y${cy}_g${g}`])return false;}
   return true;
 }
-function courtStats(c,cy){
-  const wins={},pts={},ptFor={},ptAgainst={},gpc={};
-  const pids=(S.current.assignments[c]||[]);
-  pids.forEach(id=>{wins[id]=0;pts[id]=0;ptFor[id]=0;ptAgainst[id]=0;gpc[id]=0;});
-  const numGames=pids.length===3?3:NG;
-  for(let g=1;g<=numGames;g++){
-    const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
-    const sa=[sc.a1,sc.a2].filter(x=>x!=null),sb=[sc.b1,sc.b2].filter(x=>x!=null);
-    if(sc.w==='A')sa.forEach(id=>{wins[id]=(wins[id]||0)+1;});
-    else if(sc.w==='B')sb.forEach(id=>{wins[id]=(wins[id]||0)+1;});
-    sa.forEach(id=>{pts[id]=(pts[id]||0)+sc.sA;ptFor[id]=(ptFor[id]||0)+sc.sA;ptAgainst[id]=(ptAgainst[id]||0)+sc.sB;gpc[id]=(gpc[id]||0)+1;});
-    sb.forEach(id=>{pts[id]=(pts[id]||0)+sc.sB;ptFor[id]=(ptFor[id]||0)+sc.sB;ptAgainst[id]=(ptAgainst[id]||0)+sc.sA;gpc[id]=(gpc[id]||0)+1;});
+function allCourtsDone(){
+  if(!S.current)return false;
+  for(let c=1;c<=NC;c++){
+    const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
+    if(pids.length>=2&&!isCourtDone(c))return false;
   }
-  return{wins,pts,ptFor,ptAgainst,gpc};
+  return true;
 }
-function rankCourt(c,cy){
-  const pids=S.current.assignments[c]||[];
-  if(pids.length<2)return pids.map(id=>({id,mv:'stay'}));
-  const st=courtStats(c,cy);
-  const sorted=[...pids].sort((a,b)=>{
-    if(st.pts[b]!==st.pts[a])return st.pts[b]-st.pts[a];
-    const da=st.ptFor[a]-st.ptAgainst[a],db=st.ptFor[b]-st.ptAgainst[b];
-    if(da!==db)return db-da;
-    return a-b;
-  });
-  return sorted.map((id,i)=>({id,mv:i===0&&c>1?'up':i===sorted.length-1&&c<NC?'down':'stay'}));
+// ── Auto-Advance: when ALL courts are done, automatically go to next round ──
+let _autoAdvancing=false;
+async function autoAdvanceCheck(){
+  if(!S.current||_autoAdvancing)return;
+  const cy=S.current.cycle;
+  if(cy>=NCYC)return;
+  if(!allCourtsDone())return;
+  _autoAdvancing=true;
+  toast('All courts done! Advancing to Round '+(cy+1)+'...','success');
+  try{await applyRotation();S.current.cycle++;await setKV('current_session',S.current);await loadAll();renderAll();}
+  catch(e){toast('Advance error','error');}
+  finally{_autoAdvancing=false;}
 }
-async function advanceCourtPair(courtA,courtB){
-  if(!S.current)return;
-  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
-  const cyA=getCourtCycle(courtA),cyB=getCourtCycle(courtB);
-  // Rank both courts
-  const rankA=rankCourt(courtA,cyA);
-  const rankB=rankCourt(courtB,cyB);
-  const stA=courtStats(courtA,cyA);
-  const stB=courtStats(courtB,cyB);
-  // Find who moves: courtA's loser goes down, courtB's winner goes up
-  const moverDown=courtA<courtB?rankA.find(r=>r.mv==='down'):rankB.find(r=>r.mv==='down');
-  const moverUp=courtA<courtB?rankB.find(r=>r.mv==='up'):rankA.find(r=>r.mv==='up');
-  const upperCourt=Math.min(courtA,courtB),lowerCourt=Math.max(courtA,courtB);
-  // Build movement record
-  const mv={};
-  rankA.forEach(r=>mv[r.id]=r.mv);
-  rankB.forEach(r=>mv[r.id]=r.mv);
-  // Perform the swap in assignments
-  const a=S.current.assignments;
-  if(moverDown&&moverUp){
-    a[upperCourt]=a[upperCourt].filter(id=>id!==moverDown.id);
-    a[lowerCourt]=a[lowerCourt].filter(id=>id!==moverUp.id);
-    a[lowerCourt].push(moverDown.id);
-    a[upperCourt].push(moverUp.id);
-  }
-  // Record movements
-  S.current.movements.push({cycle:cyA,courts:[courtA,courtB],mv,wins:{...stA.wins,...stB.wins},pts:{...stA.pts,...stB.pts}});
-  // Update DB stats for both courts' players
-  const updates=[];
-  [stA,stB].forEach(st=>{
-    Object.entries(st.wins).forEach(([id,w])=>{
-      const pid=parseInt(id);const p=S.players.find(x=>x.id===pid);if(!p)return;
-      const played=st.gpc[pid]||0;if(played===0)return;
-      updates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
-    });
-  });
-  if(updates.length)await Promise.all(updates);
-  // Advance both courts' cycles
-  S.current.courtCycles[courtA]=cyA+1;
-  S.current.courtCycles[courtB]=cyB+1;
-  // Update global cycle to max of all court cycles (for backward compat)
-  S.current.cycle=Math.max(...Object.values(S.current.courtCycles));
-  await setKV('current_session',S.current);
-  await loadAll();renderAll();
-  toast(`Courts ${courtA} & ${courtB} advanced to Round ${cyA+1}!`,'success');
-}
-async function advanceSingleEdgeCourt(court){
-  // For Court 1 (no court above) or Court NC (no court below) when they only need self
-  if(!S.current)return;
-  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
-  const cy=getCourtCycle(court);
-  const ranked=rankCourt(court,cy);
-  const st=courtStats(court,cy);
-  const mv={};ranked.forEach(r=>mv[r.id]=r.mv);
-  // Edge courts: winner of C1 stays, loser of C6 stays — no swap needed with neighbor
-  // But we still need the neighbor to finish for the swap to happen
-  // This function should only be called when the court is truly edge-only (C1 winner stays, C6 loser stays)
-  // The actual swap with neighbor is handled by advanceCourtPair
-  // So this is only for the case where a court has NO movement (all stay) — which only happens if court=1 and all stay, or court=NC and all stay
-  S.current.movements.push({cycle:cy,courts:[court],mv,wins:{...st.wins},pts:{...st.pts}});
-  const updates=[];
-  Object.entries(st.wins).forEach(([id,w])=>{
-    const pid=parseInt(id);const p=S.players.find(x=>x.id===pid);if(!p)return;
-    const played=st.gpc[pid]||0;if(played===0)return;
-    updates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
-  });
-  if(updates.length)await Promise.all(updates);
-  S.current.courtCycles[court]=cy+1;
-  S.current.cycle=Math.max(...Object.values(S.current.courtCycles));
-  await setKV('current_session',S.current);
-  await loadAll();renderAll();
-  toast(`Court ${court} advanced to Round ${cy+1}!`,'success');
-}
-async function tryAdvanceCourt(court){
-  if(!S.current)return;
-  const cy=getCourtCycle(court);
-  if(cy>=NCYC)return toast(`Court ${court} has completed all ${NCYC} rounds`,'warn');
-  if(!isCourtDone(court))return toast(`Court ${court} still has unfinished games`,'warn');
-  const ranked=rankCourt(court,cy);
-  const winner=ranked.find(r=>r.mv==='up');
-  const loser=ranked.find(r=>r.mv==='down');
-  // Determine which neighbor courts need to be ready
-  const needsAbove=winner&&court>1; // winner moves to court-1
-  const needsBelow=loser&&court<NC; // loser moves to court+1
-  if(needsAbove&&!isCourtDone(court-1)){
-    toast(`Waiting for Court ${court-1} to finish Round ${getCourtCycle(court-1)} before swapping`,'warn');return;
-  }
-  if(needsBelow&&!isCourtDone(court+1)){
-    toast(`Waiting for Court ${court+1} to finish Round ${getCourtCycle(court+1)} before swapping`,'warn');return;
-  }
-  // Check neighbor cycles match (both should be on same round to swap)
-  if(needsAbove&&getCourtCycle(court-1)!==cy){
-    toast(`Court ${court-1} is on a different round — wait for sync`,'warn');return;
-  }
-  if(needsBelow&&getCourtCycle(court+1)!==cy){
-    toast(`Court ${court+1} is on a different round — wait for sync`,'warn');return;
-  }
-  // Advance with neighbors
-  if(needsAbove&&needsBelow){
-    // Middle court: need both neighbors. Advance with upper first, then lower
-    await advanceCourtPair(court-1,court);
-    // After first swap, check if lower neighbor still needs swap
-    if(isCourtDone(court+1)&&getCourtCycle(court)===getCourtCycle(court+1)){
-      // This gets complex — for now, advance one pair at a time
-    }
-    return;
-  }
-  if(needsAbove){await advanceCourtPair(court-1,court);return;}
-  if(needsBelow){await advanceCourtPair(court,court+1);return;}
-  // No neighbors needed (all players stay) — just advance this court
-  await advanceSingleEdgeCourt(court);
-}
-async function autoAdvanceCheck(court){
-  if(!S.current)return;
-  const cy=getCourtCycle(court);
-  if(cy>=NCYC)return; // already at max rounds
-  if(!isCourtDone(court))return; // not all games scored yet
-  // Check if we can auto-advance this court with its neighbors
-  // A court can advance if both adjacent courts that need swapping are also done
-  const ranked=rankCourt(court,cy);
-  const winner=ranked.find(r=>r.mv==='up');
-  const loser=ranked.find(r=>r.mv==='down');
-  const needsAbove=winner&&court>1;
-  const needsBelow=loser&&court<NC;
-  // Check neighbors ready and on same cycle
-  if(needsAbove&&(!isCourtDone(court-1)||getCourtCycle(court-1)!==cy))return;
-  if(needsBelow&&(!isCourtDone(court+1)||getCourtCycle(court+1)!==cy))return;
-  // All conditions met — auto advance
-  toast(`Auto-advancing Court ${court}...`,'info');
-  await tryAdvanceCourt(court);
+async function resetSession(){
+  if(!S.current)return toast('No active session','warn');
+  if(!confirm('RESET this session? All scores and movements will be cleared. Players stay on their current courts.'))return;
+  S.current.cycle=1;S.current.scores={};S.current.movements=[];S.current.courtCycles=null;
+  S.current.attendance={};S.current.latePlayers=[];S.current.birdDistribution={};
+  await setKV('current_session',S.current);await loadAll();renderAll();toast('Session reset to Round 1','success');
 }
 async function nextCycle(){
   if(!S.current)return toast('No active session','warn');
@@ -1576,9 +1444,6 @@ async function nextCycle(){
   }
   if(missing.length&&!confirm(`Missing ${missing.length} scores. Proceed?`))return;
   await applyRotation();S.current.cycle++;
-  // Update all courtCycles to match
-  if(!S.current.courtCycles)S.current.courtCycles={};
-  for(let c=1;c<=NC;c++)S.current.courtCycles[c]=S.current.cycle;
   await setKV('current_session',S.current);await loadAll();renderAll();toast('Round '+S.current.cycle+'!','success');
 }
 async function applyRotation(){
@@ -1788,6 +1653,7 @@ function renderSessionAdmin(){
     <div class="card"><div class="card-title">Controls</div>
       <button class="btn btn-primary" onclick="nextCycle()">⏭ Next Round (Rotate)</button>
       <button class="btn btn-success" onclick="endSession()">✅ End & Save Session</button>
+      <button class="btn btn-warn" onclick="resetSession()">🔄 Reset Session (Clear Scores)</button>
       <button class="btn btn-danger" onclick="cancelSession()">✕ Cancel Session</button>
     </div>
     <div class="card"><div class="card-title">⏰ Late Arrivals</div>
@@ -2151,8 +2017,8 @@ function computeRoundStatus(){
   const wins={},pts={},ptFor={},ptAgainst={};
   S.players.forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;});
   let totalScored=0,totalCourts=0;
+  const cy=S.current.cycle;
   for(let c=1;c<=NC;c++){
-    const cy=getCourtCycle(c); // per-court cycle
     const pids=(a[c]||[]).filter(id=>S.players.find(p=>p.id===id));
     if(pids.length<2){courts[c]={scored:false,players:0,skip:true,courtCycle:cy};continue;}
     totalCourts++;
@@ -2299,14 +2165,17 @@ function renderRoundTracker(){
   }
 
   // ── Current Round Progress ──
-  const minCy=Math.min(...Object.values(S.current.courtCycles||{1:cy}));
-  const maxCy=Math.max(...Object.values(S.current.courtCycles||{1:cy}));
   html+=`<div class="card" style="margin-bottom:12px;">
-    <div class="card-title">📊 Court Progress${minCy===maxCy?` — Round ${minCy}`:` — Rounds ${minCy}–${maxCy}`}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
+    <div class="card-title">📊 Round ${cy} Progress</div>
+    <div style="display:flex;gap:4px;margin-bottom:10px;">`;
+  for(let r=1;r<=NCYC;r++){
+    const isDone=r<cy;const isActive=r===cy;
+    html+=`<div style="flex:1;height:6px;border-radius:3px;background:${isDone?'var(--green)':isActive?'var(--teal2)':'var(--s3)'};${isActive?'animation:glow 1.2s ease-in-out infinite alternate;':''}"></div>`;
+  }
+  html+=`</div>`;
+  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
   for(let c=1;c<=NC;c++){
     const cs=status.courts[c];
-    const ccyc=getCourtCycle(c);
     if(!cs||cs.skip){
       html+=`<div style="background:var(--s3);border-radius:8px;padding:8px;text-align:center;opacity:0.5;">
         <div style="font-size:11px;font-weight:800;color:var(--muted);">C${c}</div>
@@ -2319,11 +2188,10 @@ function renderRoundTracker(){
     const winnerP=cs.winner?S.players.find(p=>p.id===cs.winner):null;
     const loserP=cs.loser?S.players.find(p=>p.id===cs.loser):null;
     html+=`<div style="background:${bg};border:${border};border-radius:8px;padding:8px;text-align:center;">
-      <div style="font-size:11px;font-weight:800;color:${done?'var(--green2)':'var(--muted)'};">C${c} R${ccyc} ${done?'✅':'⏳'}</div>
+      <div style="font-size:11px;font-weight:800;color:${done?'var(--green2)':'var(--muted)'};">C${c} ${done?'✅':'⏳'}</div>
       <div style="font-size:9px;color:var(--muted);">${cs.gamesScored||0}/${cs.numGames} games</div>
       ${done&&winnerP?`<div style="font-size:9px;margin-top:3px;">${c>1?`<span style="color:var(--green2);">↑${esc(winnerP.name.split(' ')[0])}</span>`:`<span style="color:var(--muted);">👑${esc(winnerP.name.split(' ')[0])}</span>`}</div>`:''}
       ${done&&loserP?`<div style="font-size:9px;">${c<NC?`<span style="color:var(--red2);">↓${esc(loserP.name.split(' ')[0])}</span>`:`<span style="color:var(--muted);">⬇️Stay</span>`}</div>`:''}
-      ${done&&ccyc<NCYC?`<div style="margin-top:4px;"><button class="btn btn-warn btn-sm" style="padding:3px 8px;font-size:9px;" onclick="tryAdvanceCourt(${c})">⏭ Advance</button></div>`:''}
     </div>`;
   }
   html+=`</div>`;
@@ -2404,7 +2272,7 @@ function renderScoreEntry(){
   const court=parseInt(document.getElementById('sc-sel').value);
   const el=document.getElementById('score-area');if(!court){el.innerHTML='';return;}
   if(!S.current){el.innerHTML='<div class="alert alert-warn">No active session. Ask admin to start one.</div>';return;}
-  const cy=getCourtCycle(court);
+  const cy=S.current.cycle;
   // ── Preserve unsaved score values before re-render ──
   const _unsaved={};
   for(let g=1;g<=3;g++){
@@ -2445,12 +2313,16 @@ function renderScoreEntry(){
     </div>`;
   });
   html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button>`;
-  // ── Advance button when all games scored ──
+  // ── Status after scoring ──
   const courtDone=isCourtDone(court);
-  if(courtDone&&cy<NCYC){
-    html+=`<button class="btn btn-warn" style="margin-top:8px;" onclick="tryAdvanceCourt(${court})">⏭ Advance Court ${court} to Round ${cy+1}</button>`;
-  } else if(courtDone&&cy>=NCYC){
-    html+=`<div class="alert alert-success" style="margin-top:8px;text-align:center;font-weight:700;">✅ Court ${court} completed all ${NCYC} rounds!</div>`;
+  if(courtDone&&allCourtsDone()&&cy<NCYC){
+    html+=`<div class="alert alert-success" style="margin-top:8px;text-align:center;">
+      <div style="font-weight:800;">✅ All courts done! Auto-advancing to Round ${cy+1}...</div>
+    </div>`;
+  } else if(courtDone&&!allCourtsDone()&&cy<NCYC){
+    html+=`<div class="alert alert-info" style="margin-top:8px;text-align:center;font-size:12px;">✅ Court ${court} done — waiting for other courts to finish Round ${cy}</div>`;
+  } else if(cy>=NCYC&&courtDone){
+    html+=`<div class="alert alert-success" style="margin-top:8px;text-align:center;font-weight:700;">✅ All ${NCYC} rounds completed! Admin can end the session.</div>`;
   }
   html+=`<div id="res-${court}" style="margin-top:10px;"></div>`;
   el.innerHTML=html;
@@ -2494,7 +2366,7 @@ async function saveGameScore(court,gameNum){
   await setKV('current_session',S.current);
   renderScoreEntry();renderRoundTracker();renderLeaderboard();toast(`Game ${gameNum} saved!`,'success');
   // Auto-advance if all games for this court are done
-  setTimeout(()=>autoAdvanceCheck(court),500);
+  setTimeout(()=>autoAdvanceCheck(),500);
 }
 
 async function saveScores(court){
@@ -2536,7 +2408,7 @@ async function saveScores(court){
   renderRoundTracker();
   renderScoreEntry();renderRoundTracker();renderLeaderboard();renderCourts();toast('Court '+court+' saved!','success');
   // Auto-advance: if this court is fully scored, try to advance automatically
-  setTimeout(()=>autoAdvanceCheck(court),500);
+  setTimeout(()=>autoAdvanceCheck(),500);
 }
 
 // ══════════════════════════════════════════════
@@ -2594,9 +2466,8 @@ function renderRankings(){
   const liveWins={},liveLosses={},livePts={};
   S.players.forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;livePts[p.id]=0;});
   if(S.current){
-    const cc=S.current.courtCycles||{};
     for(let c=1;c<=NC;c++){
-      const cy=cc[c]||S.current.cycle||1;
+      const cy=S.current.cycle||1;
       const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
       const numGames=pids.length===3?3:NG;
       for(let g2=1;g2<=numGames;g2++){
