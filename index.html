@@ -464,7 +464,7 @@ textarea.inp{resize:vertical;min-height:80px;}
           <p>I certify that I am in good physical condition and have no medical conditions that prevent me from safely participating in badminton. If I have medical concerns, I have consulted a physician and obtained clearance. I agree to notify the organizer immediately of any discomfort, pain, or medical issues that arise during participation. DC Badminton Club is not responsible for medical or emergency costs arising from my participation.</p>
 
           <h4>5. Age Requirement</h4>
-          <p>This league is for adults aged 18 and over. Participants under 18 must have a parent or legal guardian sign a separate physical waiver form and accompany them or provide written consent. By registering through this app, I confirm I am 18 years of age or older, or that proper guardian consent has been arranged with the organizer directly.</p>
+          <p>This league is open to all ages. Participants under 18 must have a parent or legal guardian register on their behalf and sign this waiver. By registering, I confirm that I am either 18 years of age or older, or that I am a parent/legal guardian registering and accepting responsibility for a minor participant.</p>
 
           <h4>6. OCDSB Facility Rules</h4>
           <p>• Non-marking, soft-soled indoor shoes are mandatory at all times<br>
@@ -496,7 +496,7 @@ textarea.inp{resize:vertical;min-height:80px;}
         </div>
         <div class="chk-row" style="background:rgba(0,153,204,0.08);border:1px solid rgba(0,153,204,0.3);border-radius:8px;padding:10px 12px;">
           <input type="checkbox" id="w1">
-          <span style="font-weight:700;">I have read and agree to <strong>all sections above</strong> including: liability waiver & release, assumption of risk, OCDSB facility rules, non-refundable payment policy, media consent, privacy policy, e-transfer responsibility, and I confirm I am <strong>18 years of age or older</strong>.</span>
+          <span style="font-weight:700;">I have read and agree to <strong>all sections above</strong> including: liability waiver & release, assumption of risk, OCDSB facility rules, non-refundable payment policy, media consent, privacy policy, and e-transfer responsibility. If registering a minor, I accept full responsibility as parent/guardian.</span>
         </div>
         <div class="chk-row" id="w5-row" style="display:none;"><input type="checkbox" id="w5"><span>I acknowledge the e-transfer payment of <strong>$150</strong> to <strong>christygeorge993@gmail.com</strong> is required to complete my registration.</span></div>
         <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$24.50 per session</strong> via e-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</span></div>
@@ -1066,12 +1066,13 @@ function renderHome(){
   // Admin checklist
   const acl=document.getElementById('admin-checklist-home');
   if(acl&&adminUnlocked){
-    const paid=S.players.filter(p=>p.paid).length;
-    const waiver=S.players.filter(p=>p.waiverSigned).length;
-    const total=S.players.length;
-    const assigned=S.current?Object.values(S.current.assignments).flat().length:0;
-    const regPaidAmt=S.players.filter(p=>p.paid&&p.membershipType!=='spare').length*150;
-    const sparePaidCnt=S.players.filter(p=>p.paid&&p.membershipType==='spare').length;
+    const ap_=activePlayers();
+    const paid=ap_.filter(p=>p.paid).length;
+    const waiver=ap_.filter(p=>p.waiverSigned).length;
+    const total=ap_.length;
+    const assigned=S.current?Object.values(S.current.assignments).flat().length:ap_.length;
+    const regPaidAmt=ap_.filter(p=>p.paid&&p.membershipType!=='spare').length*150;
+    const sparePaidCnt=ap_.filter(p=>p.paid&&p.membershipType==='spare').length;
     acl.innerHTML=`<div class="card"><div class="card-title">✅ Admin Checklist</div>
       <div class="checklist-item"><div class="chk-icon ${paid===total&&total>0?'chk-ok':'chk-warn'}">${paid===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Payments: <strong>${paid}/${total} paid</strong></div><span class="tag ${paid===total&&total>0?'tg-green':'tg-yellow'}">$${regPaidAmt}${sparePaidCnt>0?` +${sparePaidCnt}×spare`:''}</span></div>
       <div class="checklist-item"><div class="chk-icon ${waiver===total&&total>0?'chk-ok':'chk-warn'}">${waiver===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Waivers: <strong>${waiver}/${total} signed</strong></div></div>
@@ -3115,8 +3116,8 @@ ${'─'.repeat(60)}
 3. PHYSICAL CONDITION — Participant certifies being in good physical
    condition with no medical conditions preventing safe participation.
 
-4. AGE REQUIREMENT — Participant confirms being 18 years of age or
-   older. Minors require separate guardian consent.
+4. AGE & GUARDIAN — Participant confirms being 18+ or that a parent/
+   guardian has registered and signed on the minor's behalf.
 
 5. NON-REFUNDABLE PAYMENT — All fees are final, non-negotiable, and
    non-refundable under any circumstances including illness, weather,
