@@ -1182,6 +1182,40 @@ async function addPlayer(){
 }
 async function removePlayer(id){if(!confirm('Remove this player?'))return;await sbD('players',id);await loadAll();renderAll();}
 async function togglePaid(id){const p=S.players.find(x=>x.id===id);if(!p)return;await sbU('players',id,{paid:!p.paid});await loadAll();renderAll();}
+async function markAbsentFromPlayers(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  if(!confirm(`Mark ${p.name} absent and move to bench?`))return;
+  const oldCourt=p.currentCourt;
+  // Remove from active session assignments if session active
+  if(S.current){
+    for(let c=1;c<=NC;c++){S.current.assignments[c]=(S.current.assignments[c]||[]).filter(pid=>pid!==id);}
+    if(!S.current.attendance)S.current.attendance={};
+    S.current.attendance[id]='absent';
+    await setKV('current_session',S.current);
+  }
+  // Move to bench (court 0)
+  await sbU('players',id,{current_court:0});
+  await loadAll();renderAll();
+  toast(`${p.name} marked absent — moved from Court ${oldCourt} to bench`,'success');
+}
+async function callInSpare(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  // Find first court with < 4 players
+  let targetCourt=NC;
+  if(S.current){
+    for(let c=NC;c>=1;c--){
+      if((S.current.assignments[c]||[]).length<4){targetCourt=c;break;}
+    }
+    S.current.assignments[targetCourt]=(S.current.assignments[targetCourt]||[]);
+    S.current.assignments[targetCourt].push(id);
+    if(!S.current.attendance)S.current.attendance={};
+    S.current.attendance[id]='present';
+    await setKV('current_session',S.current);
+  }
+  await sbU('players',id,{current_court:targetCourt,highest_court:targetCourt});
+  await loadAll();renderAll();
+  toast(`${p.name} called in → Court ${targetCourt}`,'success');
+}
 async function setPlayerCourt(id,c){await sbU('players',id,{current_court:parseInt(c)});await loadAll();renderAll();}
 async function toggleMembership(id,type){
   const p=S.players.find(x=>x.id===id);if(!p)return;
@@ -1249,25 +1283,40 @@ function renderAdminPlayers(){
   const sortedPlayers=[...activePlayers].sort((a,b)=>a.currentCourt-b.currentCourt);
   sortedPlayers.forEach((p,i)=>{
     const noteIcon=p.adminNote?'📝':'📋';
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);">
+    const isAbsentInSess=S.current?.attendance?.[p.id]==='absent';
+    html+=`<div style="display:flex;align-items:center;gap:6px;padding:9px 0;border-bottom:1px solid var(--border);${isAbsentInSess?'opacity:0.5;':''}">
     <div class="pl-num">${i+1}</div>
     <div style="flex:1;min-width:0;">
-      <div style="font-weight:800;font-size:13px;">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${p.waitlisted?'<span class="waitlist-badge">WAITLIST</span>':''}</div>
+      <div style="font-weight:800;font-size:13px;">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${isAbsentInSess?'<span class="tag tg-red" style="margin-left:4px;font-size:9px;">ABSENT</span>':''}</div>
       <div style="font-size:10px;color:var(--muted);">${esc(p.email)||'—'} · C${p.currentCourt} · ${p.seasonWins}W ${p.seasonLosses}L · Absent:${p.noShowCount}</div>
-      ${p.adminNote?`<div style="font-size:10px;color:var(--yellow2);margin-top:2px;">📝 ${esc(p.adminNote)}</div>`:''}
     </div>
-    <button class="notes-btn" onclick="openAdminNote(${p.id})" title="Admin Notes">${noteIcon}</button>
-    <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;" onclick="togglePaid(${p.id})">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
-    <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px;" onchange="toggleMembership(${p.id},this.value)">
-      <option value="regular" ${p.membershipType!=='spare'?'selected':''}>Regular</option>
-      <option value="spare" ${p.membershipType==='spare'?'selected':''}>Spare</option>
-    </select>
-    <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px;" onchange="setPlayerCourt(${p.id},this.value)">
+    <button class="notes-btn" onclick="openAdminNote(${p.id})">${noteIcon}</button>
+    <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;font-size:9px;" onclick="togglePaid(${p.id})">${p.paid?'✅':'⏳'}</span>
+    <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;font-size:10px;" onchange="setPlayerCourt(${p.id},this.value)">
+      <option value="0">Bench</option>
       ${[1,2,3,4,5,6].map(c=>`<option value="${c}" ${p.currentCourt===c?'selected':''}>C${c}</option>`).join('')}
     </select>
-    <button class="btn btn-danger btn-sm" onclick="removePlayer(${p.id})">✕</button>
+    <button class="btn btn-warn btn-sm" style="padding:3px 6px;font-size:9px;" onclick="markAbsentFromPlayers(${p.id})" title="Mark absent & move to bench">🚫</button>
+    <button class="btn btn-danger btn-sm" style="padding:3px 6px;font-size:9px;" onclick="removePlayer(${p.id})">✕</button>
   </div>`;
   });
+  // Show unassigned / spare pool players
+  if(unassigned.length){
+    html+=`<div class="card-title" style="margin-top:12px;color:var(--yellow2);">🪑 Spare Pool / Unassigned (${unassigned.length})</div>`;
+    unassigned.forEach(p=>{
+      html+=`<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:12px;">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}</div>
+          <div style="font-size:10px;color:var(--muted);">${esc(p.email)||'—'}</div>
+        </div>
+        <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;font-size:10px;" onchange="setPlayerCourt(${p.id},this.value)">
+          <option value="0" selected>Bench</option>
+          ${[1,2,3,4,5,6].map(c=>`<option value="${c}">C${c}</option>`).join('')}
+        </select>
+        <button class="btn btn-success btn-sm" style="padding:3px 6px;font-size:9px;" onclick="callInSpare(${p.id})">📲 Call In</button>
+      </div>`;
+    });
+  }
   html+='</div>';
   el.innerHTML=html;
 }
