@@ -676,6 +676,7 @@ textarea.inp{resize:vertical;min-height:80px;}
         </select>
         <label class="lbl">Starting Court</label>
         <select class="inp" id="np-court">
+          <option value="0">No Court (Spare Pool)</option>
           <option value="1">Court 1</option><option value="2">Court 2</option>
           <option value="3" selected>Court 3</option><option value="4">Court 4</option>
           <option value="5">Court 5</option><option value="6">Court 6</option>
@@ -1142,7 +1143,7 @@ function renderSchedule(){
 // PLAYERS
 // ══════════════════════════════════════════════
 async function addPlayer(){
-  const name=g('np-name').trim(),court=parseInt(g('np-court'))||NC;
+  const name=g('np-name').trim(),court=parseInt(g('np-court'));
   const mtype=g('np-membership')||'regular';
   if(!name){toast('Enter a name','warn');return;}
   if(mtype==='regular'){
