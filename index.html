@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DC Badminton Club</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d2137">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DC Badminton">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230d2137' width='100' height='100' rx='20'/><text y='65' x='50' text-anchor='middle' font-size='50'>🏸</text></svg>">
 <style>
 :root{
   --navy:#0d2137;--navy2:#1a3a5c;--teal:#0099cc;--teal2:#00c2ff;
@@ -263,8 +269,21 @@ textarea.inp{resize:vertical;min-height:80px;}
 .pos-name{font-size:20px;font-weight:900;color:#fff;}
 .pos-stat{font-size:12px;color:var(--muted);margin-top:4px;}
 
-/* WHATSAPP SHARE */
+/* MESSENGER SHARE */
+.messenger-btn{background:#0084ff;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;justify-content:center;margin-top:8px;}
+.messenger-btn:hover{background:#0070e0;}
 .wa-btn{background:#25d366;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;justify-content:center;margin-top:8px;}
+
+/* PLAYER AVATARS */
+.avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;text-transform:uppercase;}
+.avatar-sm{width:22px;height:22px;font-size:9px;}
+.avatar-lg{width:36px;height:36px;font-size:14px;}
+
+/* GAME HISTORY */
+.gh-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;margin-bottom:4px;font-size:12px;}
+.gh-win{background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2);}
+.gh-loss{background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.15);}
+.gh-tie{background:rgba(243,156,18,0.06);border:1px solid rgba(243,156,18,0.15);}
 
 /* CHECKLIST */
 .checklist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
@@ -734,7 +753,7 @@ const SB='https://bwepvxelvwgwxrnaglrx.supabase.co';
 const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZXB2eGVsdndnd3hybmFnbHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNjY2MDAsImV4cCI6MjA5MDc0MjYwMH0.goOjPH3LVeuXDdIHeBvtfP9atnxmc1DYSFWmct4iadk';
 const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
 
-async function sbG(t,f=''){const r=await fetch(`${SB}/rest/v1/${t}?${f}&order=created_at.asc`,{headers:H});return r.json();}
+async function sbG(t,f=''){const q=f.includes('order=')?f:`${f}&order=created_at.asc`;const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:H});return r.json();}
 async function sbP(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});return r.json();}
 async function sbU(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});return r.json();}
 async function sbD(t,id){await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});}
@@ -924,7 +943,7 @@ async function loadAll(){
 }
 
 let _isSyncing=false;
-function startSync(){setInterval(async()=>{_isSyncing=true;setSS('syncing');await loadAll();renderAll();setSS('ok');_isSyncing=false;},15000);}
+function startSync(){setInterval(async()=>{_isSyncing=true;setSS('syncing');try{await loadAll();renderAll();setSS('ok');}catch(e){setSS('err');}finally{_isSyncing=false;}},15000);}
 function setSS(s){const d=document.getElementById('sdot'),l=document.getElementById('slbl');if(!d)return;d.className='sdot'+(s==='syncing'?' syncing':s==='err'?' err':'');l.textContent=s==='syncing'?'Syncing':s==='err'?'Offline':'Live';}
 
 // ══════════════════════════════════════════════
@@ -1089,7 +1108,7 @@ function renderSchedule(){
 // PLAYERS
 // ══════════════════════════════════════════════
 async function addPlayer(){
-  const name=g('np-name').trim(),court=parseInt(g('np-court'));
+  const name=g('np-name').trim(),court=parseInt(g('np-court'))||NC;
   const mtype=g('np-membership')||'regular';
   if(!name){toast('Enter a name','warn');return;}
   if(mtype==='regular'){
@@ -1337,7 +1356,7 @@ async function postAnn(){
   document.getElementById('ann-title').value='';document.getElementById('ann-body').value='';
   await loadAll();renderAll();toast('Posted!','success');
 }
-async function deleteAnn(id){await sbD('announcements',id);await loadAll();renderAll();}
+async function deleteAnn(id){if(!confirm('Delete this announcement?'))return;await sbD('announcements',id);await loadAll();renderAll();}
 function renderAnnouncementsAdmin(){
   const el=document.getElementById('ann-admin-list');if(!el)return;
   if(!S.announcements.length){el.innerHTML='<div class="empty-state"><div class="ei">📣</div><div class="em">No announcements</div></div>';return;}
@@ -1397,7 +1416,7 @@ async function applyRotation(){
       const ptCmp = pts[b]-pts[a];
       if(ptCmp !== 0) return ptCmp;
       if(ptDiff_a !== ptDiff_b) return ptDiff_b - ptDiff_a;
-      return Math.random() - 0.5;
+      return a - b;
     });
     sorted.forEach((id,i)=>{if(i===0&&c>1)mv[id]='up';else if(i===sorted.length-1&&c<NC)mv[id]='down';else mv[id]='stay';});
   }
@@ -1428,28 +1447,44 @@ async function endSession(){
   if(!confirm('End session and save?'))return;
   // ── Process current cycle's scores (applyRotation only runs on nextCycle, so the last cycle's W/L would otherwise be lost) ──
   const cy=S.current.cycle;
-  const finalWins={},finalGamesPlayed={};
-  S.players.forEach(p=>{finalWins[p.id]=0;finalGamesPlayed[p.id]=0;});
+  const alreadyProcessed=S.current.movements.some(m=>m.cycle===cy);
+  const finalWins={},finalGamesPlayed={},finalPts={},finalPtFor={},finalPtAgainst={};
+  S.players.forEach(p=>{finalWins[p.id]=0;finalGamesPlayed[p.id]=0;finalPts[p.id]=0;finalPtFor[p.id]=0;finalPtAgainst[p.id]=0;});
   for(let c=1;c<=NC;c++)for(let g=1;g<=NG;g++){
     const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
     const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
     const side_b=[sc.b1,sc.b2].filter(x=>x!=null);
     if(sc.w==='A') side_a.forEach(id=>{finalWins[id]=(finalWins[id]||0)+1;});
     else if(sc.w==='B') side_b.forEach(id=>{finalWins[id]=(finalWins[id]||0)+1;});
-    side_a.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;});
-    side_b.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;});
+    side_a.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;finalPts[id]=(finalPts[id]||0)+sc.sA;finalPtFor[id]=(finalPtFor[id]||0)+sc.sA;finalPtAgainst[id]=(finalPtAgainst[id]||0)+sc.sB;});
+    side_b.forEach(id=>{finalGamesPlayed[id]=(finalGamesPlayed[id]||0)+1;finalPts[id]=(finalPts[id]||0)+sc.sB;finalPtFor[id]=(finalPtFor[id]||0)+sc.sB;finalPtAgainst[id]=(finalPtAgainst[id]||0)+sc.sA;});
   }
-  // Apply last cycle's W/L to season stats
-  const statUpdates=[];
-  Object.entries(finalWins).forEach(([id,w])=>{
-    const pid=parseInt(id);
-    const p=S.players.find(x=>x.id===pid);
-    if(!p)return;
-    const played=finalGamesPlayed[pid]||0;
-    if(played===0)return;
-    statUpdates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
-  });
-  if(statUpdates.length) await Promise.all(statUpdates);
+  // Apply last cycle's W/L to season stats (only if not already processed by nextCycle)
+  if(!alreadyProcessed){
+    const statUpdates=[];
+    Object.entries(finalWins).forEach(([id,w])=>{
+      const pid=parseInt(id);
+      const p=S.players.find(x=>x.id===pid);
+      if(!p)return;
+      const played=finalGamesPlayed[pid]||0;
+      if(played===0)return;
+      statUpdates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
+    });
+    if(statUpdates.length) await Promise.all(statUpdates);
+  }
+  // ── Compute movement map for last cycle (so arrows display correctly) ──
+  const a=S.current.assignments;
+  const finalMv={};
+  for(let c=1;c<=NC;c++){
+    const pids=a[c]||[];if(pids.length<2){pids.forEach(id=>finalMv[id]='stay');continue;}
+    const sorted=[...pids].sort((x,y)=>{
+      const ptCmp=finalPts[y]-finalPts[x];if(ptCmp!==0)return ptCmp;
+      const pd_x=finalPtFor[x]-finalPtAgainst[x],pd_y=finalPtFor[y]-finalPtAgainst[y];
+      if(pd_x!==pd_y)return pd_y-pd_x;
+      return x-y;
+    });
+    sorted.forEach((id,i)=>{if(i===0&&c>1)finalMv[id]='up';else if(i===sorted.length-1&&c<NC)finalMv[id]='down';else finalMv[id]='stay';});
+  }
   // ── Process attendance — determine absent players FIRST ──
   const att=S.current.attendance||{};
   const absentIds=new Set();
@@ -1480,8 +1515,8 @@ async function endSession(){
   if(demotionUpdates.length) await Promise.all(demotionUpdates);
   // ── Save session record ──
   S.current.completed=true;
-  // Store last cycle movement data
-  S.current.movements.push({cycle:cy,wins:{...finalWins}});
+  // Store last cycle movement data (include mv and pts so arrows display correctly)
+  if(!alreadyProcessed) S.current.movements.push({cycle:cy,mv:finalMv,wins:{...finalWins},pts:{...finalPts}});
   await setKV('completed_sessions',[...S.sessions,JSON.parse(JSON.stringify(S.current))]);
   await setKV('current_session',null);
   await loadAll();renderAll();toast('Session saved! 🏸','success');
@@ -1956,7 +1991,7 @@ function computeRoundStatus(){
         const pd_x=ptFor[x]-ptAgainst[x],pd_y=ptFor[y]-ptAgainst[y];
         if(pts[y]!==pts[x])return pts[y]-pts[x];
         if(pd_x!==pd_y)return pd_y-pd_x;
-        return 0;
+        return x - y;
       });
       courtWinner=sorted[0];
       courtLoser=sorted[sorted.length-1];
@@ -1973,7 +2008,7 @@ function computeRoundStatus(){
       if(pts[y]!==pts[x])return pts[y]-pts[x];
       const pd_x=ptFor[x]-ptAgainst[x],pd_y=ptFor[y]-ptAgainst[y];
       if(pd_x!==pd_y)return pd_y-pd_x;
-      return 0;
+      return x - y;
     });
     sorted.forEach((id,i)=>{
       if(i===0&&c>1)projectedMv[id]='up';
@@ -2012,9 +2047,80 @@ function renderRoundTracker(){
   if(!S.current){el.innerHTML='';return;}
   const cy=S.current.cycle;
   const status=computeRoundStatus();
-  let html=`<div class="card" style="margin-bottom:12px;">
-    <div class="card-title">📊 Round ${cy} Progress</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
+  let html='';
+
+  // ── Completed Rounds History ──
+  const movements=S.current.movements||[];
+  if(movements.length>0){
+    html+=`<div class="card" style="margin-bottom:12px;">
+      <div class="card-title">📋 Completed Rounds</div>`;
+    movements.forEach(m=>{
+      const mCy=m.cycle;
+      const mWins=m.wins||{};
+      const mPts=m.pts||{};
+      const mMv=m.mv||{};
+      // Build per-court standings for this completed round
+      html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:800;color:var(--green2);">Round ${mCy} ✅</div>
+          <span class="tag tg-green" style="font-size:9px;">Completed</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">`;
+      for(let c=1;c<=NC;c++){
+        // Find which players were on this court before rotation
+        // We need to look at the assignments BEFORE this cycle's rotation was applied
+        // The assignments at cycle start can be reconstructed: for cycle 1, it's the original assignments
+        // For later cycles, the previous movement already changed assignments
+        // The simplest approach: show who moved and their results
+        const cls=c===1?'var(--gold)':c===2?'var(--silver)':c===3?'var(--bronze)':'var(--muted)';
+        // Get players who had movements from/to this court
+        const courtMovers=Object.entries(mMv).filter(([id,dir])=>{
+          // Players whose movement was recorded for this court
+          return true; // show all, we'll filter by court below
+        });
+        html+=`<div style="background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:5px;">
+          <div style="font-size:9px;font-weight:800;color:${cls};text-align:center;margin-bottom:3px;">C${c}</div>`;
+        // Show players with their wins and movement from this round
+        Object.entries(mMv).forEach(([id,dir])=>{
+          const pid=parseInt(id);
+          const p=S.players.find(x=>x.id===pid);
+          if(!p)return;
+          // Check if player was on this court (we can infer from current assignments after rotation)
+          // Since movements already applied, we need to reverse: if player moved up from c, they were on c
+          // For now, show players grouped by their post-rotation court
+          // Actually better: check the scores to see which court the player played on
+          let playedOnCourt=false;
+          for(let g2=1;g2<=NG;g2++){
+            const sc=S.current.scores[`c${c}_y${mCy}_g${g2}`];
+            if(!sc)continue;
+            if([sc.a1,sc.a2,sc.b1,sc.b2].filter(x=>x!=null).includes(pid)){playedOnCourt=true;break;}
+          }
+          if(!playedOnCourt)return;
+          const w=mWins[pid]||0;
+          const mvIcon=dir==='up'&&c>1?'<span style="color:var(--green2);font-weight:800;"> ↑</span>':dir==='down'&&c<NC?'<span style="color:var(--red2);font-weight:800;"> ↓</span>':'';
+          html+=`<div style="font-size:9px;padding:1px 0;display:flex;justify-content:space-between;align-items:center;">
+            <span>${esc(p.name.split(' ')[0])}${mvIcon}</span>
+            <span style="color:var(--teal2);font-weight:700;">${w}W</span>
+          </div>`;
+        });
+        html+=`</div>`;
+      }
+      html+=`</div></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // ── Current Round Progress ──
+  html+=`<div class="card" style="margin-bottom:12px;">
+    <div class="card-title">📊 Round ${cy} ${cy<=NCYC?'Progress':''}${cy>NCYC?' (Final)':''}</div>
+    <div style="display:flex;gap:4px;margin-bottom:10px;">`;
+  for(let r=1;r<=NCYC;r++){
+    const isDone=r<cy;const isActive=r===cy;
+    html+=`<div style="flex:1;height:6px;border-radius:3px;background:${isDone?'var(--green)':isActive?'var(--teal2)':'var(--s3)'};${isActive?'animation:glow 1.2s ease-in-out infinite alternate;':''}"></div>`;
+  }
+  html+=`</div>`;
+  // Court status grid
+  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
   for(let c=1;c<=NC;c++){
     const cs=status.courts[c];
     if(!cs||cs.skip){
@@ -2036,8 +2142,47 @@ function renderRoundTracker(){
     </div>`;
   }
   html+=`</div>`;
+
+  // ── Current Round Standings (per-court rankings) ──
+  if(status.totalScored>0){
+    html+=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">Round ${cy} Standings</div>`;
+    for(let c=1;c<=NC;c++){
+      const cs=status.courts[c];
+      if(!cs||cs.skip||!cs.pids||cs.pids.length<2)continue;
+      if(cs.gamesScored===0)continue;
+      const pids=cs.pids;
+      const courtPlayers=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+      const sorted=[...courtPlayers].sort((a,b)=>{
+        const wa=status.wins[a.id]||0,wb=status.wins[b.id]||0;
+        if(wb!==wa)return wb-wa;
+        const pa=status.pts[a.id]||0,pb=status.pts[b.id]||0;
+        return pb-pa;
+      });
+      const cls=c===1?'var(--gold)':c===2?'var(--silver)':c===3?'var(--bronze)':'var(--teal2)';
+      html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px;">
+        <div style="font-size:10px;font-weight:800;color:${cls};margin-bottom:4px;">Court ${c} ${cs.scored?'✅':''}</div>`;
+      sorted.forEach((p,i)=>{
+        const w=status.wins[p.id]||0;
+        const pt=status.pts[p.id]||0;
+        const mvDir=i===0&&c>1?'up':i===sorted.length-1&&c<NC?'down':'stay';
+        const mvIcon=mvDir==='up'?'<span style="color:var(--green2);font-weight:800;"> ↑</span>':mvDir==='down'?'<span style="color:var(--red2);font-weight:800;"> ↓</span>':'';
+        const rankBg=i===0?'rgba(39,174,96,0.1)':i===sorted.length-1?'rgba(192,57,43,0.07)':'transparent';
+        html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:5px;background:${rankBg};margin-bottom:2px;">
+          <div style="font-size:11px;font-weight:700;">${i+1}. ${esc(p.name.split(' ')[0])}${cs.scored?mvIcon:''}</div>
+          <div style="display:flex;gap:8px;font-size:10px;">
+            <span style="color:var(--teal2);font-weight:700;">${w}W</span>
+            <span style="color:var(--muted);">${pt}pts</span>
+          </div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  }
+
   // Status summary
-  html+=`<div style="font-size:12px;text-align:center;color:var(--muted);">${status.totalScored}/${status.totalCourts} courts scored`;
+  html+=`<div style="font-size:12px;text-align:center;color:var(--muted);margin-top:8px;">${status.totalScored}/${status.totalCourts} courts scored`;
   if(status.allScored)html+=` — <span style="color:var(--green2);font-weight:700;">Ready to advance!</span>`;
   html+=`</div>`;
   // Projected next round if all scored
@@ -2060,6 +2205,13 @@ function renderRoundTracker(){
     }
     html+=`</div></div>`;
   }
+  // Share buttons
+  if(status.totalScored>0){
+    html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
+      <button class="messenger-btn" onclick="shareMessenger()" style="margin-top:0;">💬 Share to Messenger</button>
+      <button class="btn btn-ghost" onclick="copyRoundSummary()" style="margin-top:0;">📋 Copy Summary</button>
+    </div>`;
+  }
   html+=`</div>`;
   el.innerHTML=html;
 }
@@ -2068,6 +2220,18 @@ function renderScoreEntry(){
   const el=document.getElementById('score-area');if(!court){el.innerHTML='';return;}
   if(!S.current){el.innerHTML='<div class="alert alert-warn">No active session. Ask admin to start one.</div>';return;}
   const cy=S.current.cycle;
+  // ── Check if previous round needs to be advanced first ──
+  if(cy>1){
+    const prevRoundProcessed=(S.current.movements||[]).some(m=>m.cycle===cy-1);
+    if(!prevRoundProcessed){
+      el.innerHTML=`<div class="alert alert-warn" style="text-align:center;">
+        <div style="font-size:18px;margin-bottom:8px;">🔒</div>
+        <div style="font-weight:800;margin-bottom:4px;">Round ${cy-1} Not Yet Advanced</div>
+        <div style="font-size:12px;">Complete all Round ${cy-1} scores and ask the admin to click <strong>"Next Round"</strong> before entering Round ${cy} scores.</div>
+      </div>`;
+      return;
+    }
+  }
   // ── Preserve unsaved score values before re-render ──
   const _unsaved={};
   for(let g=1;g<=3;g++){
@@ -2173,7 +2337,7 @@ async function saveScores(court){
   entries.forEach(e=>S.current.scores[`c${court}_y${cy}_g${e.g}`]=e);
   await setKV('current_session',S.current);
   const wins={};players.forEach(p=>wins[p.id]=0);
-  entries.forEach(e=>{if(e.w==='A'){wins[e.a1]++;wins[e.a2]++;}else if(e.w==='B'){wins[e.b1]++;wins[e.b2]++;}});
+  entries.forEach(e=>{if(e.w==='A'){wins[e.a1]++;if(e.a2!=null)wins[e.a2]++;}else if(e.w==='B'){wins[e.b1]++;if(e.b2!=null)wins[e.b2]++;}});
   const sorted=[...players].sort((a,b)=>wins[b.id]-wins[a.id]);
   // Each player's max possible wins depends on mode (4p doubles=3 games, 3p rr=2 games, 2p=3 games)
   const maxWins=players.length===3?2:3;
@@ -2227,9 +2391,10 @@ function renderLeaderboard(){
     const totalGP=p.gamesPlayed+liveWins[p.id]+liveLosses[p.id];
     const wr=totalGP>0?Math.round(totalW/totalGP*100):0;
     const liveTag=liveWins[p.id]>0||liveLosses[p.id]>0?` <span style="color:var(--yellow2);font-size:9px;">(+${liveWins[p.id]}W live)</span>`:'';
-    return `<div class="lbrow">
+    return `<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
       <div class="lbrank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
-      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${liveTag}</div><div class="lbsub">Court ${p.currentCourt} · ${totalGP} games</div></div>
+      ${avatar(p.name)}
+      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${liveTag}</div><div class="lbsub">Court ${p.currentCourt} · ${totalGP} games · <span style="color:var(--teal2);">tap for history</span></div></div>
       <div class="lbnums">
         <div class="lbnum"><div class="v">${totalW}</div><div class="l">W</div></div>
         <div class="lbnum"><div class="v">${totalL}</div><div class="l">L</div></div>
@@ -2244,7 +2409,23 @@ function computePlayerStreakAndImprovement(){
     let cur=0,max=0;
     S.sessions.forEach(s=>{
       let sessWins=0,sessTotalGames=0;
-      (s.movements||[]).forEach(m=>{sessWins+=m.wins?.[p.id]||0;sessTotalGames+=NG;});
+      (s.movements||[]).forEach(m=>{
+        const pw=m.wins?.[p.id]||0;
+        // Count actual games this player participated in from score data
+        let playerGames=0;
+        for(let c=1;c<=NC;c++){
+          const pids=s.assignments?.[c]||[];
+          if(!pids.includes(p.id))continue;
+          const numG=pids.length===3?3:NG;
+          for(let g2=1;g2<=numG;g2++){
+            const sc=s.scores?.[`c${c}_y${m.cycle}_g${g2}`];
+            if(!sc)continue;
+            const allIds=[sc.a1,sc.a2,sc.b1,sc.b2].filter(x=>x!=null);
+            if(allIds.includes(p.id))playerGames++;
+          }
+        }
+        sessWins+=pw;sessTotalGames+=playerGames;
+      });
       if(sessTotalGames>0&&sessWins>sessTotalGames/2){cur++;max=Math.max(max,cur);}
       else if(sessTotalGames>0){cur=0;}
     });
@@ -2606,10 +2787,205 @@ function generateSeasonPDF(){
 }
 
 // ══════════════════════════════════════════════
+// PLAYER AVATARS
+// ══════════════════════════════════════════════
+const AVATAR_COLORS=['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#00bcd4','#ff5722','#607d8b','#795548'];
+function avatarColor(name){let h=0;for(let i=0;i<(name||'').length;i++)h=name.charCodeAt(i)+((h<<5)-h);return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+function avatar(name,size=''){
+  const n=String(name||'?');const parts=n.trim().split(/\s+/);
+  const initials=parts.length>=2?parts[0][0]+parts[parts.length-1][0]:n.substring(0,2);
+  const cls='avatar'+(size?' avatar-'+size:'');
+  return `<div class="${cls}" style="background:${avatarColor(n)};">${esc(initials.toUpperCase())}</div>`;
+}
+
+// ══════════════════════════════════════════════
+// MESSENGER SHARE
+// ══════════════════════════════════════════════
+function buildRoundSummary(){
+  if(!S.current)return'No active session';
+  const cy=S.current.cycle;const status=computeRoundStatus();
+  let text=`🏸 DC Badminton Club\nSession ${S.current.number} — Round ${cy}\n\n`;
+  for(let c=1;c<=NC;c++){
+    const cs=status.courts[c];if(!cs||cs.skip)continue;
+    const pids=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+    const medal=c===1?'🥇':c===2?'🥈':c===3?'🥉':'';
+    text+=`${medal}Court ${c}: `;
+    const sorted=[...pids].sort((a,b)=>(status.wins[b.id]||0)-(status.wins[a.id]||0));
+    text+=sorted.map(p=>{
+      const w=status.wins[p.id]||0;
+      const mv=status.projectedMv[p.id];
+      const arrow=mv==='up'?'⬆️':mv==='down'?'⬇️':'';
+      return `${p.name.split(' ')[0]}(${w}W)${arrow}`;
+    }).join(', ')+'\n';
+  }
+  text+='\n🏆 Leaderboard:\n';
+  const lb=[...S.players].sort((a,b)=>{
+    const wa=a.seasonWins+(status.wins[a.id]||0),wb=b.seasonWins+(status.wins[b.id]||0);
+    return wb-wa;
+  }).slice(0,5);
+  lb.forEach((p,i)=>{
+    const w=p.seasonWins+(status.wins[p.id]||0);
+    text+=`${i+1}. ${p.name} — ${w}W\n`;
+  });
+  return text;
+}
+function shareMessenger(){
+  const text=buildRoundSummary();
+  const encoded=encodeURIComponent(text);
+  // Try native share first (mobile), fallback to Messenger deep link
+  if(navigator.share){
+    navigator.share({title:'DC Badminton Club',text}).catch(()=>{});
+  }else{
+    window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent('https://chriz93.github.io/dcbadmintonclub/')}&redirect_uri=${encodeURIComponent('https://chriz93.github.io/dcbadmintonclub/')}&app_id=0`,'_blank');
+  }
+}
+function copyRoundSummary(){
+  const text=buildRoundSummary();
+  navigator.clipboard.writeText(text).then(()=>toast('Copied to clipboard! Paste in Messenger','success')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    toast('Copied to clipboard!','success');
+  });
+}
+
+// ══════════════════════════════════════════════
+// SOUND & VIBRATION NOTIFICATIONS
+// ══════════════════════════════════════════════
+let _lastAllScoredState=false;
+function checkAllScoredNotification(){
+  if(!S.current)return;
+  const status=computeRoundStatus();
+  if(status.allScored&&!_lastAllScoredState){
+    playScoreCompleteSound();
+    if(navigator.vibrate)navigator.vibrate([200,100,200]);
+    toast('All courts scored! Ready to advance 🎉','success');
+  }
+  _lastAllScoredState=status.allScored;
+}
+function playScoreCompleteSound(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const notes=[523.25,659.25,783.99,1046.50]; // C5,E5,G5,C6
+    notes.forEach((freq,i)=>{
+      const osc=ctx.createOscillator();const gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.frequency.value=freq;osc.type='sine';
+      gain.gain.setValueAtTime(0.15,ctx.currentTime+i*0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.12+0.3);
+      osc.start(ctx.currentTime+i*0.12);osc.stop(ctx.currentTime+i*0.12+0.3);
+    });
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════
+// GAME-BY-GAME SCORE HISTORY
+// ══════════════════════════════════════════════
+function renderGameHistory(playerId){
+  const p=S.players.find(x=>x.id===playerId);if(!p)return;
+  let html=`<div style="max-height:60vh;overflow-y:auto;">`;
+  // Current session games
+  if(S.current){
+    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin-bottom:6px;">Session ${S.current.number} (Active)</div>`;
+    let found=false;
+    for(let cy=1;cy<=S.current.cycle;cy++){
+      for(let c=1;c<=NC;c++){
+        for(let g2=1;g2<=NG;g2++){
+          const sc=S.current.scores[`c${c}_y${cy}_g${g2}`];if(!sc)continue;
+          const allIds=[sc.a1,sc.a2,sc.b1,sc.b2].filter(x=>x!=null);
+          if(!allIds.includes(playerId))continue;
+          found=true;
+          const onSideA=[sc.a1,sc.a2].filter(x=>x!=null).includes(playerId);
+          const won=(onSideA&&sc.w==='A')||(!onSideA&&sc.w==='B');
+          const tied=sc.w==='T';
+          const cls=won?'gh-win':tied?'gh-tie':'gh-loss';
+          const sideANames=[sc.a1,sc.a2].filter(x=>x!=null).map(id=>S.players.find(x=>x.id===id)?.name.split(' ')[0]||'?').join(' & ');
+          const sideBNames=[sc.b1,sc.b2].filter(x=>x!=null).map(id=>S.players.find(x=>x.id===id)?.name.split(' ')[0]||'?').join(' & ');
+          html+=`<div class="gh-row ${cls}">
+            <span style="font-weight:800;width:55px;flex-shrink:0;font-size:10px;color:var(--muted);">R${cy} C${c}G${g2}</span>
+            <span style="flex:1;">${esc(sideANames)} <strong>${sc.sA}-${sc.sB}</strong> ${esc(sideBNames)}</span>
+            <span style="font-weight:800;font-size:11px;color:${won?'var(--green2)':tied?'var(--yellow2)':'var(--red2)'};">${won?'W':tied?'T':'L'}</span>
+          </div>`;
+        }
+      }
+    }
+    if(!found)html+=`<div style="font-size:11px;color:var(--muted);padding:6px 0;">No games yet this session</div>`;
+  }
+  // Completed sessions
+  [...S.sessions].reverse().forEach(s=>{
+    html+=`<div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:10px 0 6px;">Session ${s.number} — ${s.date}</div>`;
+    let found=false;
+    for(let cy=1;cy<=NCYC;cy++){
+      for(let c=1;c<=NC;c++){
+        for(let g2=1;g2<=NG;g2++){
+          const sc=s.scores?.[`c${c}_y${cy}_g${g2}`];if(!sc)continue;
+          const allIds=[sc.a1,sc.a2,sc.b1,sc.b2].filter(x=>x!=null);
+          if(!allIds.includes(playerId))continue;
+          found=true;
+          const onSideA=[sc.a1,sc.a2].filter(x=>x!=null).includes(playerId);
+          const won=(onSideA&&sc.w==='A')||(!onSideA&&sc.w==='B');
+          const tied=sc.w==='T';
+          const cls=won?'gh-win':tied?'gh-tie':'gh-loss';
+          const sideANames=[sc.a1,sc.a2].filter(x=>x!=null).map(id=>S.players.find(x=>x.id===id)?.name.split(' ')[0]||'?').join(' & ');
+          const sideBNames=[sc.b1,sc.b2].filter(x=>x!=null).map(id=>S.players.find(x=>x.id===id)?.name.split(' ')[0]||'?').join(' & ');
+          html+=`<div class="gh-row ${cls}">
+            <span style="font-weight:800;width:55px;flex-shrink:0;font-size:10px;color:var(--muted);">R${cy} C${c}G${g2}</span>
+            <span style="flex:1;">${esc(sideANames)} <strong>${sc.sA}-${sc.sB}</strong> ${esc(sideBNames)}</span>
+            <span style="font-weight:800;font-size:11px;color:${won?'var(--green2)':tied?'var(--yellow2)':'var(--red2)'};">${won?'W':tied?'T':'L'}</span>
+          </div>`;
+        }
+      }
+    }
+    if(!found)html+=`<div style="font-size:11px;color:var(--muted);padding:4px 0;">Did not play</div>`;
+  });
+  html+=`</div>`;
+  openModal(`${p.name} — Game History`,html);
+}
+
+// ══════════════════════════════════════════════
+// SUPABASE REALTIME (WebSocket)
+// ══════════════════════════════════════════════
+let _realtimeWs=null;
+function startRealtime(){
+  try{
+    const wsUrl=SB.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SK+'&vsn=1.0.0';
+    _realtimeWs=new WebSocket(wsUrl);
+    _realtimeWs.onopen=()=>{
+      // Join the app_state changes channel
+      const joinMsg=JSON.stringify({topic:'realtime:public:app_state',event:'phx_join',payload:{config:{broadcast:{self:false},presence:{key:''}}},ref:'1'});
+      _realtimeWs.send(joinMsg);
+      // Heartbeat every 30s
+      setInterval(()=>{
+        if(_realtimeWs&&_realtimeWs.readyState===1){
+          _realtimeWs.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));
+        }
+      },30000);
+    };
+    _realtimeWs.onmessage=(e)=>{
+      try{
+        const msg=JSON.parse(e.data);
+        if(msg.event==='INSERT'||msg.event==='UPDATE'||msg.event==='DELETE'){
+          // Data changed — reload
+          if(!_isSyncing){
+            _isSyncing=true;setSS('syncing');
+            loadAll().then(()=>{renderAll();setSS('ok');}).catch(()=>setSS('err')).finally(()=>{_isSyncing=false;});
+          }
+        }
+      }catch(err){}
+    };
+    _realtimeWs.onerror=()=>{};
+    _realtimeWs.onclose=()=>{
+      // Reconnect after 5s
+      setTimeout(startRealtime,5000);
+    };
+  }catch(e){
+    // Fallback: realtime not available, polling still runs
+  }
+}
+
+// ══════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════
 function g(id){return document.getElementById(id)?.value||'';}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 let toastT;
 function toast(msg,type='info'){
   let t=document.getElementById('_t');
@@ -2632,6 +3008,8 @@ function renderAll(){
   if(adminUnlocked){renderAdminPlayers();renderRegPlayers();renderSessionAdmin();renderAssignUI();renderPayments();renderAnnouncementsAdmin();}
   // Skip score re-render during background sync to preserve unsaved input values
   if(!_isSyncing){const sel=document.getElementById('sc-sel');if(sel&&sel.value)renderScoreEntry();}
+  // Check if all courts scored — trigger notification
+  checkAllScoredNotification();
 }
 
 // ══════════════════════════════════════════════
@@ -2641,7 +3019,7 @@ async function init(){
   await initInviteGate();
   setSS('syncing');
   const ok=await loadAll();
-  if(ok){setSS('ok');checkRegistrationStatus();renderAll();startSync();setInterval(renderHome,30000);}
+  if(ok){setSS('ok');checkRegistrationStatus();renderAll();startSync();startRealtime();setInterval(renderHome,30000);registerServiceWorker();}
   else{setSS('err');toast('Cannot connect to database','error');}
 }
 
@@ -2672,7 +3050,7 @@ async function markPlayerLate(){
     if((S.current.assignments[c]||[]).includes(pid)){originalCourt=c;break;}
   }
   if(!originalCourt)return toast('Player not assigned','warn');
-  const lastCourt=6;
+  const lastCourt=NC;
   const a=S.current.assignments;
   for(let c=1;c<=NC;c++)a[c]=(a[c]||[]).filter(id=>id!==pid);
   if(!a[lastCourt])a[lastCourt]=[];
@@ -2790,6 +3168,11 @@ function renderQA(){
     </div>`;
   });
   el.innerHTML=html;
+}
+function registerServiceWorker(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
 }
 init();
 </script>
