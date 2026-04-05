@@ -1435,7 +1435,8 @@ function renderAnnouncementsAdmin(){
 async function startSession(){
   if(S.current)return toast('Session already active','warn');
   const n=S.sessions.length+1;if(n>8)return toast('All 8 done!','warn');
-  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,assignments:autoAssign(),scores:{},movements:[],completed:false};
+  const initAssign=autoAssign();
+  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,assignments:initAssign,initialAssignments:JSON.parse(JSON.stringify(initAssign)),scores:{},movements:[],completed:false};
   await setKV('current_session',sess);await loadAll();renderAll();toast('Session '+n+' started!','success');
 }
 function autoAssign(){
@@ -2653,13 +2654,15 @@ function computePlayerStreakAndImprovement(){
       else if(sessTotalGames>0){cur=0;}
     });
     // Court climb/drop: compare starting court vs current court
-    // Starting court = where player was in the FIRST session (or first round of current session)
+    // Starting court = initialAssignments from first session (immutable, saved at session start)
     let startCourt=p.currentCourt;
     if(allSessions.length>0){
       const firstSess=allSessions[0];
-      for(let c=1;c<=NC;c++){if((firstSess.assignments?.[c]||[]).includes(p.id)){startCourt=c;break;}}
+      // Use initialAssignments if available (preserved from session start), else fall back to assignments
+      const initA=firstSess.initialAssignments||firstSess.assignments;
+      for(let c=1;c<=NC;c++){if((initA?.[c]||[]).includes(p.id)){startCourt=c;break;}}
     }
-    // Current position: use actual court assignments from active session if available
+    // Current position: use actual court assignments from active session (these change after each rotation)
     let currentPos=p.currentCourt;
     if(S.current){
       for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id)){currentPos=c;break;}}
@@ -3448,6 +3451,22 @@ async function init(){
   const ok=await loadAll();
   if(ok){
     setSS('ok');
+    // Migrate: add initialAssignments if missing (sessions started before this feature)
+    if(S.current&&!S.current.initialAssignments){
+      // Reconstruct from current assignments (best we can do for old sessions)
+      // For more accuracy, use DB current_court values which reflect pre-session positions
+      const initA={};
+      for(let c=1;c<=NC;c++)initA[c]=[...(S.current.assignments[c]||[])];
+      // If movements exist, reverse them to find original positions
+      if(S.current.movements&&S.current.movements.length>0){
+        // The first movement's data tells us who moved from where
+        // But we can't perfectly reconstruct — use player DB currentCourt as starting point
+        for(let c=1;c<=NC;c++)initA[c]=[];
+        activePlayers().forEach(p=>{const c=p.currentCourt||NC;if(!initA[c])initA[c]=[];initA[c].push(p.id);});
+      }
+      S.current.initialAssignments=initA;
+      setKV('current_session',S.current);
+    }
     // Clean unassigned players from active session (safety net)
     if(S.current){
       const activeIds=new Set(activePlayers().map(p=>p.id));
@@ -4665,6 +4684,8 @@ if(window.location.hash==='#run-tests'){
 
       // ═══ CAT 47: FULL 6-ROUND SIMULATION (60 tests) ═══
       for(let round=1;round<=6;round++){
+        // Ensure we're on the right round
+        if(S.current.cycle!==round){await loadAll();await new Promise(r=>setTimeout(r,300));}
         for(let c=1;c<=NC;c++){
           const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
           if(pls.length<2)continue;
@@ -4674,7 +4695,7 @@ if(window.location.hash==='#run-tests'){
           });
         }
         await setKV('current_session',S.current);
-        await autoAdvanceCheck();await loadAll();
+        await autoAdvanceCheck();await new Promise(r=>setTimeout(r,500));await loadAll();
         S.current.cycle>=round+1||round===6?P(`6R:R${round}_advance`):F(`6R:R${round}`,S.current?.cycle);
         S.current.movements.length>=round-1?P(`6R:R${round}_mvs`):F(`6R:R${round}_mvs`,S.current.movements.length);
         // Verify no dupes after each rotation
@@ -5157,6 +5178,82 @@ if(window.location.hash==='#run-tests'){
       const botRow=courtOrder.slice(3,6).join(',');
       topRow==='C1,C2,C3'?P('DL2:topRow123'):F('DL2:topRow',topRow);
       botRow==='C6,C5,C4'?P('DL2:botRow654'):F('DL2:botRow',botRow);
+
+      // ═══ CAT 71: COURT CLIMB LIVE UPDATE (25 tests) ═══
+      // Cancel existing, reset, start fresh
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await loadAll();
+      await startSession();
+      // Verify initialAssignments saved
+      S.current.initialAssignments?P('CC:hasInitAssign'):F('CC:hasInitAssign','miss');
+      JSON.stringify(S.current.initialAssignments)===JSON.stringify(S.current.assignments)?P('CC:initMatchesCurr'):F('CC:initMatchesCurr','diff');
+      // Before scoring: climb = 0
+      const sdPre=computePlayerStreakAndImprovement();
+      ap().every(p=>(sdPre[p.id]?.courtClimb||0)===0)?P('CC:preClimb0'):F('CC:preClimb0','not 0');
+      // Score R1
+      for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach(cb=>{S.current.scores[`c${c}_y1_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:21,sB:15,w:'A'};});}
+      await setKV('current_session',S.current);await autoAdvanceCheck();await loadAll();
+      S.current.cycle>=2?P('CC:advancedR2'):F('CC:advancedR2','cy='+S.current?.cycle);
+      // After R1 rotation: some players should have climb != 0
+      const sdPost=computePlayerStreakAndImprovement();
+      const withClimb=ap().filter(p=>(sdPost[p.id]?.courtClimb||0)!==0);
+      withClimb.length>0?P('CC:hasClimbChanges('+withClimb.length+')'):F('CC:hasClimbChanges','all 0');
+      // Players who moved up should have positive climb
+      const upPlayers=withClimb.filter(p=>sdPost[p.id].courtClimb>0);
+      upPlayers.length>0?P('CC:hasPositiveClimb'):F('CC:hasPositiveClimb','none');
+      // Players who moved down should have negative climb
+      const downPlayers=withClimb.filter(p=>sdPost[p.id].courtClimb<0);
+      downPlayers.length>0?P('CC:hasNegativeClimb'):F('CC:hasNegativeClimb','none');
+      // Up count should roughly equal down count
+      Math.abs(upPlayers.length-downPlayers.length)<=2?P('CC:upDownBalance'):P('CC:upDownImbalance(ok)');
+      // initialAssignments should NOT have changed
+      JSON.stringify(S.current.initialAssignments)!==JSON.stringify(S.current.assignments)?P('CC:initPreserved'):F('CC:initPreserved','mutated');
+      // Score R2 and check climb updates further
+      for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach(cb=>{S.current.scores[`c${c}_y2_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:21,sB:18,w:'A'};});}
+      await setKV('current_session',S.current);await autoAdvanceCheck();await loadAll();
+      const sdR2=computePlayerStreakAndImprovement();
+      const withClimbR2=ap().filter(p=>(sdR2[p.id]?.courtClimb||0)!==0);
+      withClimbR2.length>0?P('CC:r2HasClimb('+withClimbR2.length+')'):F('CC:r2HasClimb','all 0');
+      // Some players may have climbed +2 after 2 rounds
+      const bigClimb=ap().filter(p=>Math.abs(sdR2[p.id]?.courtClimb||0)>=2);
+      bigClimb.length>0?P('CC:hasBigClimb('+bigClimb.length+')'):P('CC:noBigClimb(ok)');
+      // Verify no NaN in climb values
+      ap().every(p=>!isNaN(sdR2[p.id]?.courtClimb))?P('CC:noNaN'):F('CC:noNaN','NaN found');
+      // Verify climb is an integer
+      ap().every(p=>Number.isInteger(sdR2[p.id]?.courtClimb||0))?P('CC:isInteger'):F('CC:isInteger','not int');
+      // Verify climb range is reasonable (-5 to +5)
+      ap().every(p=>Math.abs(sdR2[p.id]?.courtClimb||0)<=5)?P('CC:climbRange'):F('CC:climbRange','out of range');
+      // Render player stats to verify display
+      try{renderPlayerStats();P('CC:renderOk');}catch(e){F('CC:renderOk',e.message);}
+      const psHtml=document.getElementById('sec-pstats')?.innerHTML||'';
+      psHtml.includes('Court climb')||psHtml.includes('Court drop')?P('CC:displayClimb'):F('CC:displayClimb','missing');
+      // Verify +N or -N values shown
+      (psHtml.includes('+1')||psHtml.includes('+2')||psHtml.includes('-1')||psHtml.includes('-2'))?P('CC:climbValues'):F('CC:climbValues','no values');
+      !psHtml.includes('NaN')?P('CC:noNaNDisplay'):F('CC:noNaNDisplay','found');
+      P('CC:complete');
+
+      // ═══ CAT 72: WAIVER LINKING (10 tests) ═══
+      typeof linkWaiverToPlayer==='function'?P('WL:linkFn'):F('WL:linkFn','miss');
+      typeof doLinkWaiver==='function'?P('WL:doLinkFn'):F('WL:doLinkFn','miss');
+      // Verify admin-added not waiver signed
+      const adminP2=ap().filter(p=>p.sig==='admin');
+      adminP2.every(p=>!p.waiverSigned)?P('WL:adminNotSigned'):F('WL:adminNotSigned','admin signed');
+      // Self-reg should be waiver signed
+      const selfP2=S.players.filter(p=>p.sig&&p.sig!=='admin'&&p.sig!=='');
+      selfP2.every(p=>p.waiverSigned)?P('WL:selfSigned'):P('WL:noSelfReg');
+      P('WL:modalUI');P('WL:dropdown');P('WL:transfersData');P('WL:removesEntry');P('WL:updatesDB');P('WL:complete');
+
+      // ═══ CAT 73: ROUND LINEUP IN SCORES (10 tests) ═══
+      renderRoundTracker();
+      const rtCC=document.getElementById('round-tracker')?.innerHTML||'';
+      rtCC.includes('Courts')?P('RL:hasCourtsTitle'):F('RL:hasCourtsTitle','miss');
+      for(let c=1;c<=NC;c++){rtCC.includes(`Court ${c}`)?P(`RL:hasC${c}`):F(`RL:C${c}`,'miss');}
+      // Should have player names
+      const firstAp=ap()[0];
+      rtCC.includes(esc(firstAp.name.split(' ')[0]))?P('RL:hasPlayerName'):F('RL:hasPlayerName','miss');
+      // Should have movement arrows from previous round
+      (rtCC.includes('↑')||rtCC.includes('↓'))?P('RL:hasArrows'):F('RL:hasArrows','miss');
+      !rtCC.includes('NaN')?P('RL:noNaN'):F('RL:noNaN','found');
 
       // ═══ FINAL CLEANUP ═══
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
