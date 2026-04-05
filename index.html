@@ -1345,6 +1345,7 @@ function regPlayerCard(p,showApprove){
       <div style="display:flex;gap:5px;">
         <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;" onclick="togglePaid(${p.id})">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
         ${showApprove?`<button class="btn btn-success btn-sm" onclick="approvePlayer(${p.id})" style="padding:4px 8px;">✓ Approve</button>`:''}
+        <button class="btn btn-primary btn-sm" onclick="linkWaiverToPlayer(${p.id})" style="padding:4px 8px;">🔗 Link to Player</button>
         <button class="btn btn-ghost btn-sm" onclick="editRegistration(${p.id})" style="padding:4px 8px;">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>
       </div>
@@ -2627,6 +2628,7 @@ function computePlayerStreakAndImprovement(){
   if(S.current&&S.current.movements&&S.current.movements.length>0){
     allSessions.push(S.current); // include active session data
   }
+  // Use all players (including inactive) so game history works for everyone
   S.players.forEach(p=>{
     let cur=0,max=0;
     allSessions.forEach(s=>{
@@ -2870,6 +2872,41 @@ async function approvePlayer(id){
   approvals[id]={...(approvals[id]||{}),approved:true,waitlisted:false};
   await setKV('player_approvals',approvals);
   await loadAll();renderAll();toast('Player approved!','success');
+}
+function linkWaiverToPlayer(regId){
+  const regP=S.players.find(x=>x.id===regId);if(!regP)return;
+  // Show modal with active players to link to
+  const courtPlayers=activePlayers();
+  const html=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+    Link <strong>${esc(regP.name)}</strong>'s waiver & registration data to an existing player on court.
+    This transfers waiver signature, contact info, and marks the player as waiver-signed.
+  </div>
+  <select class="inp" id="link-target-select">
+    <option value="">— Select Player —</option>
+    ${courtPlayers.map(p=>`<option value="${p.id}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}
+  </select>
+  <button class="btn btn-success" onclick="doLinkWaiver(${regId})">Link Waiver</button>`;
+  openModal('Link Waiver — '+regP.name, html);
+}
+async function doLinkWaiver(regId){
+  const targetId=parseInt(document.getElementById('link-target-select')?.value);
+  if(!targetId){toast('Select a player to link to','warn');return;}
+  const regP=S.players.find(x=>x.id===regId);
+  const targetP=S.players.find(x=>x.id===targetId);
+  if(!regP||!targetP)return;
+  // Transfer waiver data: update the target player's sig and waiver_signed in DB
+  await sbU('players',targetId,{sig:regP.sig,waiver_signed:true,email:regP.email||targetP.email,phone:regP.phone||targetP.phone,emergency:regP.emergency||targetP.emergency,medical:regP.medical||targetP.medical});
+  // Store in KV as well
+  const approvals=await getKV('player_approvals')||{};
+  approvals[targetId]={...(approvals[targetId]||{}),waiverLinkedFrom:regId,waiverSig:regP.sig};
+  await setKV('player_approvals',approvals);
+  // Optionally remove the registration entry (it's now linked)
+  if(confirm(`Waiver linked! Remove ${regP.name}'s separate registration entry? (recommended — their data is now on ${targetP.name}'s record)`)){
+    await sbD('players',regId);
+    const pa2=await getKV('player_approvals')||{};delete pa2[regId];await setKV('player_approvals',pa2);
+  }
+  closeModal();await loadAll();renderAll();
+  toast(`Waiver linked: ${regP.name} → ${targetP.name}`,'success');
 }
 async function assignCourtToRegistered(id,courtVal){
   const court=parseInt(courtVal);
