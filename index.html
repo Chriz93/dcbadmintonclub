@@ -1092,11 +1092,15 @@ function renderHome(){
     const assigned=S.current?Object.values(S.current.assignments).flat().length:ap_.length;
     const regPaidAmt=ap_.filter(p=>p.paid&&p.membershipType!=='spare').length*150;
     const sparePaidCnt=ap_.filter(p=>p.paid&&p.membershipType==='spare').length;
+    const selfReg=S.players.filter(p=>p.sig&&p.sig!=='admin');
+    const pendingReg=selfReg.filter(p=>!p.approved);
+    const regWaiver=selfReg.filter(p=>p.waiverSigned).length;
     acl.innerHTML=`<div class="card"><div class="card-title">✅ Admin Checklist</div>
       <div class="checklist-item"><div class="chk-icon ${paid===total&&total>0?'chk-ok':'chk-warn'}">${paid===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Payments: <strong>${paid}/${total} paid</strong></div><span class="tag ${paid===total&&total>0?'tg-green':'tg-yellow'}">$${regPaidAmt}${sparePaidCnt>0?` +${sparePaidCnt}×spare`:''}</span></div>
-      <div class="checklist-item"><div class="chk-icon ${waiver===total&&total>0?'chk-ok':'chk-warn'}">${waiver===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Waivers: <strong>${waiver}/${total} signed</strong></div></div>
+      <div class="checklist-item"><div class="chk-icon ${waiver===total&&total>0?'chk-ok':'chk-warn'}">${waiver===total&&total>0?'✓':'!'}</div><div style="flex:1;font-size:13px;">Waivers: <strong>${waiver}/${total} on-court signed</strong>${regWaiver>0?` · <span style="color:var(--teal2);">${regWaiver} registered</span>`:''}</div></div>
       <div class="checklist-item"><div class="chk-icon ${S.current?'chk-ok':'chk-no'}">${S.current?'✓':'✗'}</div><div style="flex:1;font-size:13px;">Session: <strong>${S.current?'Active — '+S.current.date:'Not started'}</strong></div></div>
-      <div class="checklist-item" style="border:none;"><div class="chk-icon ${assigned>0?'chk-ok':'chk-no'}">${assigned>0?'✓':'✗'}</div><div style="flex:1;font-size:13px;">Court assignments: <strong>${assigned} players</strong></div></div>
+      <div class="checklist-item"><div class="chk-icon ${assigned>0?'chk-ok':'chk-no'}">${assigned>0?'✓':'✗'}</div><div style="flex:1;font-size:13px;">Court assignments: <strong>${assigned} players</strong></div></div>
+      ${selfReg.length>0?`<div class="checklist-item" style="border:none;"><div class="chk-icon ${pendingReg.length>0?'chk-warn':'chk-ok'}">${pendingReg.length>0?'!':'✓'}</div><div style="flex:1;font-size:13px;">Registrations: <strong>${selfReg.length} registered</strong>${pendingReg.length>0?` · <span style="color:var(--yellow2);">${pendingReg.length} pending approval</span>`:''}</div></div>`:''}
     </div>`;
   }else if(acl)acl.innerHTML='';
 }
