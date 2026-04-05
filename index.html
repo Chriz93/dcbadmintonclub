@@ -923,7 +923,7 @@ async function loadAll(){
 }
 
 let _isSyncing=false;
-function startSync(){setInterval(async()=>{_isSyncing=true;setSS('syncing');await loadAll();renderAll();setSS('ok');_isSyncing=false;},3000);}
+function startSync(){setInterval(async()=>{_isSyncing=true;setSS('syncing');await loadAll();renderAll();setSS('ok');_isSyncing=false;},15000);}
 function setSS(s){const d=document.getElementById('sdot'),l=document.getElementById('slbl');if(!d)return;d.className='sdot'+(s==='syncing'?' syncing':s==='err'?' err':'');l.textContent=s==='syncing'?'Syncing':s==='err'?'Offline':'Live';}
 
 // ══════════════════════════════════════════════
@@ -1905,6 +1905,14 @@ function renderScoreEntry(){
   const el=document.getElementById('score-area');if(!court){el.innerHTML='';return;}
   if(!S.current){el.innerHTML='<div class="alert alert-warn">No active session. Ask admin to start one.</div>';return;}
   const cy=S.current.cycle;
+  // ── Preserve unsaved score values before re-render ──
+  const _unsaved={};
+  for(let g=1;g<=3;g++){
+    const aEl=document.getElementById(`si_${court}_${g}_a`);
+    const bEl=document.getElementById(`si_${court}_${g}_b`);
+    if(aEl&&aEl.value!=='')_unsaved[`${g}_a`]=aEl.value;
+    if(bEl&&bEl.value!=='')_unsaved[`${g}_b`]=bEl.value;
+  }
   const players=(S.current.assignments[court]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
   if(players.length<2){
     el.innerHTML=`<div class="alert alert-warn">Court ${court} has ${players.length===0?'no':'only 1'} player assigned — minimum 2 needed.</div>`;return;
@@ -1937,7 +1945,18 @@ function renderScoreEntry(){
     </div>`;
   });
   html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button><div id="res-${court}" style="margin-top:10px;"></div>`;
-  el.innerHTML=html;combos.forEach(({g})=>liveW(court,g));
+  el.innerHTML=html;
+  // ── Restore unsaved score values after re-render ──
+  for(let g=1;g<=3;g++){
+    const key=`c${court}_y${cy}_g${g}`;
+    if(!S.current.scores[key]){
+      const aEl=document.getElementById(`si_${court}_${g}_a`);
+      const bEl=document.getElementById(`si_${court}_${g}_b`);
+      if(aEl&&_unsaved[`${g}_a`])aEl.value=_unsaved[`${g}_a`];
+      if(bEl&&_unsaved[`${g}_b`])bEl.value=_unsaved[`${g}_b`];
+    }
+  }
+  combos.forEach(({g})=>liveW(court,g));
 }
 function liveW(c,g){
   const a=document.getElementById(`si_${c}_${g}_a`),b=document.getElementById(`si_${c}_${g}_b`),w=document.getElementById(`wr_${c}_${g}`);
