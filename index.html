@@ -960,7 +960,7 @@ async function loadAll(){
     const mo=membershipOverrides||{},pa=playerApprovals||{};
     S.players=(pl||[]).map(p=>{
       const kv=pa[p.id]||{};
-      return{id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed||!!p.sig,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:mo[p.id]||kv.membershipType||p.membership_type||'regular',approved:kv.approved!==undefined?kv.approved:(p.approved===undefined?true:!!p.approved),registeredAt:kv.registeredAt||p.registered_at||p.created_at||'',waitlisted:kv.waitlisted!==undefined?kv.waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''};
+      return{id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:(p.waiver_signed&&p.sig!=='admin')||(!!(p.sig&&p.sig!=='admin')),paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:mo[p.id]||kv.membershipType||p.membership_type||'regular',approved:kv.approved!==undefined?kv.approved:(p.approved===undefined?true:!!p.approved),registeredAt:kv.registeredAt||p.registered_at||p.created_at||'',waitlisted:kv.waitlisted!==undefined?kv.waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''};
     });
     S.announcements=an||[];
     S.current=cur||null;
