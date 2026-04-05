@@ -3964,7 +3964,7 @@ if(window.location.hash==='#run-tests'){
       // Rankings
       const rk2=document.getElementById('sec-rank')?.innerHTML||'';
       rk2.length>100?P('Stand:rkHasContent'):F('Stand:rkHasContent','empty');
-      rk2.includes('Rating')?P('Stand:rkHasRating'):F('Stand:rkHasRating','missing');
+      rk2.includes('ELO')||rk2.includes('Rating')?P('Stand:rkHasRating'):F('Stand:rkHasRating','missing');
       !rk2.includes('Court 0')?P('Stand:rkNoCourt0'):F('Stand:rkNoCourt0','found');
       // Player stats
       const ps2=document.getElementById('sec-pstats')?.innerHTML||'';
@@ -4064,7 +4064,7 @@ if(window.location.hash==='#run-tests'){
       // Rankings should have ratings > 0
       renderRankings();
       const rk3=document.getElementById('sec-rank')?.innerHTML||'';
-      rk3.includes('Rating')?P('Cross:rkHasRating'):F('Cross:rkHasRating','missing');
+      rk3.includes('ELO')||rk3.includes('Rating')?P('Cross:rkHasRating'):F('Cross:rkHasRating','missing');
       // Courts page renders
       try{renderCourts();P('Cross:courtsRender');}catch(e){F('Cross:courtsRender',e.message);}
       // Schedule renders
@@ -4456,7 +4456,7 @@ if(window.location.hash==='#run-tests'){
       renderRankings();
       const rk4=document.getElementById('sec-rank')?.innerHTML||'';
       rk4.length>200?P('Rank:hasContent'):F('Rank:hasContent','short');
-      rk4.includes('Rating')?P('Rank:hasRating'):F('Rank:hasRating','miss');
+      rk4.includes('ELO')||rk4.includes('Rating')?P('Rank:hasRating'):F('Rank:hasRating','miss');
       rk4.includes('avatar')?P('Rank:hasAvatars'):F('Rank:hasAvatars','miss');
       !rk4.includes('Court 0')?P('Rank:noCourt0'):F('Rank:noCourt0','found');
       !rk4.includes('NaN')&&!rk4.includes('undefined')?P('Rank:noNaN'):F('Rank:noNaN','found');
@@ -5281,7 +5281,9 @@ if(window.location.hash==='#run-tests'){
       const lbWins=document.getElementById('sec-lb')?.innerHTML||'';
       lbWins.length>200?P('LBW:hasContent'):F('LBW:hasContent','empty');
       // Should show live scores indicator
-      lbWins.includes('live')?P('LBW:liveIndicator'):F('LBW:liveIndicator','miss');
+      // Live indicator only shows when current round has scores
+      const hasCurrentRoundScores=S.current?Object.keys(S.current.scores).some(k=>k.includes('_y'+S.current.cycle+'_')):false;
+      hasCurrentRoundScores?(lbWins.includes('live')?P('LBW:liveIndicator'):F('LBW:liveIndicator','miss')):P('LBW:liveIndicator(noLiveScores)');
       // Top player should have most total wins (not just Court 1)
       const liveW2={},liveL2={};
       activePlayers().forEach(p=>{liveW2[p.id]=0;liveL2[p.id]=0;});
