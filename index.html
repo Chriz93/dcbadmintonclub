@@ -1125,9 +1125,19 @@ async function addPlayer(){
     const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
     if(regularCount>=24){toast('Regular slots full (24/24). Please choose Spare.','warn');return;}
   }
-  if(S.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Player already exists','warn');return;}
-  // NOTE: membership_type column may not exist in DB — do NOT include it in INSERT
-  // We use KV store (membership_overrides) as the reliable source for membership type
+  // Check if player exists as a registered (court=0) player — if so, activate them instead of creating new
+  const existingReg=S.players.find(p=>p.name.toLowerCase()===name.toLowerCase()&&(!p.currentCourt||p.currentCourt===0));
+  if(existingReg){
+    // Activate the registered player by assigning them a court
+    await sbU('players',existingReg.id,{current_court:court,highest_court:court});
+    const approvals=await getKV('player_approvals')||{};
+    approvals[existingReg.id]={...(approvals[existingReg.id]||{}),approved:true};
+    await setKV('player_approvals',approvals);
+    const mo=await getKV('membership_overrides')||{};mo[existingReg.id]=mtype;await setKV('membership_overrides',mo);
+    await loadAll();renderAll();toast(`${existingReg.name} activated from registration → Court ${court}`,'success');return;
+  }
+  // Check for true duplicates (already active on a court)
+  if(S.players.find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.currentCourt>0)){toast('Player already active on a court','warn');return;}
   let res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:true,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
   if(!res||res.code||res.message||!Array.isArray(res)){
     res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
@@ -1316,8 +1326,13 @@ function regPlayerCard(p,showApprove){
       </div>
     </div>
     <div style="font-size:11px;color:var(--teal2);margin-bottom:4px;">📧 ${esc(p.email)}</div>
-    <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div>📞 ${esc(p.phone)}</div><div>${p.currentCourt>0?'🏸 Court '+p.currentCourt:'🏸 Unassigned'}</div>
+    <div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center;">
+      <div>📞 ${esc(p.phone)}</div>
+      <div>${p.currentCourt>0?'🏸 Court '+p.currentCourt:'🏸 Unassigned'}</div>
+      <select class="inp" style="font-size:10px;padding:4px 6px;margin:0;" onchange="assignCourtToRegistered(${p.id},this.value)">
+        <option value="0" ${!p.currentCourt||p.currentCourt===0?'selected':''}>Unassigned</option>
+        ${[1,2,3,4,5,6].map(c=>`<option value="${c}" ${p.currentCourt===c?'selected':''}>Court ${c}</option>`).join('')}
+      </select>
     </div>
     <div style="font-size:11px;margin-top:4px;">🚨 ${esc(p.emergency)}</div>
     ${p.medical?`<div style="font-size:11px;margin-top:2px;color:var(--yellow2);">⚕️ ${esc(p.medical)}</div>`:''}
@@ -1442,8 +1457,8 @@ async function autoAdvanceCheck(){
 async function resetSession(){
   if(!S.current)return toast('No active session','warn');
   if(!confirm('RESET this session? All scores, movements, and season stats from this session will be cleared.'))return;
-  // Reset all player season stats to 0 (they accumulate during applyRotation)
-  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0}));
+  // Reset all player season stats and highest_court to 0
+  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt}));
   if(resets.length)await Promise.all(resets);
   S.current.cycle=1;S.current.scores={};S.current.movements=[];S.current.courtCycles=null;
   S.current.attendance={};S.current.latePlayers=[];S.current.birdDistribution={};
@@ -1593,11 +1608,10 @@ async function endSession(){
 async function cancelSession(){
   if(!confirm('Cancel session? All scores and stats from this session will be lost.'))return;
   // Reset player season stats accumulated during this session
-  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0}));
+  const resets=activePlayers().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt}));
   if(resets.length)await Promise.all(resets);
   await setKV('current_session',null);
-  // Also clear completed sessions if this was the only one
-  await loadAll();renderAll();toast('Session cancelled — stats cleared','success');
+  await loadAll();renderAll();toast('Session cancelled — all stats cleared','success');
 }
 
 // ── Cascade fill: when a player is absent, promote top player from court below ──
@@ -2340,14 +2354,28 @@ function renderScoreEntry(){
   html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button>`;
   // ── Status after scoring ──
   const courtDone=isCourtDone(court);
-  if(courtDone&&allCourtsDone()&&cy<NCYC){
+  if(courtDone&&allCourtsDone()){
+    // Show next round court formation
+    const status=computeRoundStatus();
     html+=`<div class="alert alert-success" style="margin-top:8px;text-align:center;">
       <div style="font-weight:800;">✅ All courts done! Auto-advancing to Round ${cy+1}...</div>
     </div>`;
-  } else if(courtDone&&!allCourtsDone()&&cy<NCYC){
-    html+=`<div class="alert alert-info" style="margin-top:8px;text-align:center;font-size:12px;">✅ Court ${court} done — waiting for other courts to finish Round ${cy}</div>`;
+    if(status.projectedAssignments){
+      html+=`<div class="card" style="margin-top:8px;"><div class="card-title">📋 Round ${cy+1} Court Assignments</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">`;
+      for(let c2=1;c2<=NC;c2++){
+        const pids=status.projectedAssignments[c2]||[];
+        const pls=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+        const cls=c2===1?'var(--gold)':c2===2?'var(--silver)':c2===3?'var(--bronze)':'var(--teal2)';
+        html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:6px;">
+          <div style="font-size:10px;font-weight:800;color:${cls};text-align:center;margin-bottom:4px;">Court ${c2}</div>
+          ${pls.map(p=>{const mv=status.projectedMv[p.id];const icon=mv==='up'?'<span style="color:var(--green2);"> ↑</span>':mv==='down'?'<span style="color:var(--red2);"> ↓</span>':'';return `<div style="font-size:10px;padding:1px 0;">${esc(p.name.split(' ')[0])}${icon}</div>`;}).join('')}
+        </div>`;
+      }
+      html+=`</div></div>`;
+    }
   } else if(courtDone&&!allCourtsDone()){
-    // already handled above
+    html+=`<div class="alert alert-info" style="margin-top:8px;text-align:center;font-size:12px;">✅ Court ${court} done — waiting for other courts to finish Round ${cy}</div>`;
   }
   html+=`<div id="res-${court}" style="margin-top:10px;"></div>`;
   el.innerHTML=html;
@@ -2461,12 +2489,15 @@ function renderLeaderboard(){
   }
   const hasLive=Object.values(liveWins).some(v=>v>0);
   const sorted=[...activePlayers()].sort((a,b)=>{
+    // Primary: court position (Court 1 first)
+    if(a.currentCourt!==b.currentCourt)return a.currentCourt-b.currentCourt;
+    // Secondary: total wins
     const totalW_a=a.seasonWins+(liveWins[a.id]||0),totalW_b=b.seasonWins+(liveWins[b.id]||0);
     if(totalW_b!==totalW_a)return totalW_b-totalW_a;
-    const gp_a=a.gamesPlayed+liveWins[a.id]+liveLosses[a.id],gp_b=b.gamesPlayed+liveWins[b.id]+liveLosses[b.id];
+    // Tertiary: win rate
+    const gp_a=a.gamesPlayed+(liveWins[a.id]||0)+(liveLosses[a.id]||0),gp_b=b.gamesPlayed+(liveWins[b.id]||0)+(liveLosses[b.id]||0);
     const wr_a=gp_a>0?totalW_a/gp_a:0,wr_b=gp_b>0?totalW_b/gp_b:0;
-    if(wr_a!==wr_b)return wr_b-wr_a;
-    return 0;
+    return wr_b-wr_a;
   });
   el.innerHTML=(hasLive?`<div class="alert alert-info" style="margin-bottom:10px;font-size:11px;">📊 Standings include live Round ${S.current.cycle} scores (unsaved to season totals until round advances)</div>`:'')+sorted.map((p,i)=>{
     const totalW=p.seasonWins+liveWins[p.id],totalL=p.seasonLosses+liveLosses[p.id];
@@ -2761,6 +2792,19 @@ async function approvePlayer(id){
   await setKV('player_approvals',approvals);
   await loadAll();renderAll();toast('Player approved!','success');
 }
+async function assignCourtToRegistered(id,courtVal){
+  const court=parseInt(courtVal);
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  await sbU('players',id,{current_court:court,highest_court:court||0});
+  // If assigning to a court, also auto-approve
+  if(court>0){
+    const approvals=await getKV('player_approvals')||{};
+    approvals[id]={...(approvals[id]||{}),approved:true};
+    await setKV('player_approvals',approvals);
+  }
+  await loadAll();renderAll();
+  toast(court>0?`${p.name} assigned to Court ${court}`:`${p.name} unassigned from court`,'success');
+}
 async function rejectPlayer(id){
   const p=S.players.find(x=>x.id===id);
   if(!p||!confirm(`Remove ${p.name}'s registration? This cannot be undone.`))return;
@@ -3029,10 +3073,71 @@ function buildRoundSummary(){
 }
 function exportWaiver(playerId){
   const p=S.players.find(x=>x.id===playerId);if(!p)return;
-  const text=`WAIVER RECORD — DC Badminton Club\n${'='.repeat(40)}\nName: ${p.name}\nEmail: ${p.email}\nPhone: ${p.phone}\nEmergency: ${p.emergency}\nMedical: ${p.medical||'None'}\n\nWaiver Signed: ${p.waiverSigned?'YES':'NO'}\nDigital Signature: "${p.sig}"\nRegistered: ${p.registeredAt}\nMembership: ${p.membershipType}\nApproved: ${p.approved?'YES':'PENDING'}\n${'='.repeat(40)}\nGenerated: ${new Date().toLocaleString()}`;
+  const text=`DC BADMINTON CLUB — MAPLEWOOD LADDER LEAGUE
+WAIVER & CONSENT RECORD
+${'='.repeat(60)}
+
+PARTICIPANT INFORMATION
+Name: ${p.name}
+Email: ${p.email}
+Phone: ${p.phone}
+Emergency Contact: ${p.emergency}
+Medical Conditions: ${p.medical||'None disclosed'}
+
+REGISTRATION DETAILS
+Date Registered: ${p.registeredAt?new Date(p.registeredAt).toLocaleString():'Unknown'}
+Membership Type: ${p.membershipType==='spare'?'Spare ($24.50/session)':'Regular ($150/season)'}
+Approved: ${p.approved?'YES':'PENDING'}
+Payment Status: ${p.paid?'PAID':'UNPAID'}
+
+WAIVER & CONSENT STATUS
+Waiver Signed: ${p.waiverSigned?'YES':'NO'}
+Digital Signature: "${p.sig}"
+
+${'─'.repeat(60)}
+TERMS AGREED TO (by checking the consent box and signing):
+${'─'.repeat(60)}
+
+1. ASSUMPTION OF RISK — Participant understands badminton involves
+   inherent risks including muscle strains, falls, collisions, and
+   eye injuries. Participant voluntarily assumes full responsibility.
+
+2. RELEASE OF LIABILITY — Participant releases Christy George
+   (organizer), co-organizers, volunteers, and OCDSB from claims
+   arising from ordinary negligence during participation.
+
+3. PHYSICAL CONDITION — Participant certifies being in good physical
+   condition with no medical conditions preventing safe participation.
+
+4. AGE REQUIREMENT — Participant confirms being 18 years of age or
+   older. Minors require separate guardian consent.
+
+5. NON-REFUNDABLE PAYMENT — All fees are final, non-negotiable, and
+   non-refundable under any circumstances including illness, weather,
+   cancellations, or schedule conflicts.
+
+6. E-TRANSFER RESPONSIBILITY — Participant is solely responsible for
+   ensuring payment is received at christygeorge993@gmail.com.
+
+7. MEDIA CONSENT — Participant grants permission for photos/videos
+   to be used for promotional purposes.
+
+8. PRIVACY — Personal information collected solely for league
+   administration. Will not be sold or shared with third parties.
+
+9. OCDSB FACILITY RULES — Non-marking shoes mandatory, no food/drinks
+   in gymnasium, no alcohol/smoking/vaping, arrive after 8:15 PM,
+   vacate by 10:15 PM, no nuts/shellfish/latex on premises.
+
+${'='.repeat(60)}
+This constitutes a binding digital agreement between the participant
+and Christy George (individual organizer).
+
+Generated: ${new Date().toLocaleString()}
+Document ID: DCBC-${p.id}-${Date.now()}`;
   const blob=new Blob([text],{type:'text/plain'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`waiver_${p.name.replace(/\s+/g,'_')}.txt`;a.click();
+  a.download=`waiver_${p.name.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`;a.click();
   toast('Waiver exported!','success');
 }
 function shareMessenger(){
