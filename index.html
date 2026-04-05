@@ -516,7 +516,7 @@ textarea.inp{resize:vertical;min-height:80px;}
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Please read all rules carefully before agreeing.</div>
         <ol style="padding-left:18px;margin:0 0 16px;display:flex;flex-direction:column;gap:9px;">
           <li style="font-size:13px;line-height:1.5;">Arrive 5 minutes early. If late by more than 5 minutes, you will be moved to the last court.</li>
-          <li style="font-size:13px;line-height:1.5;">Warm-up is limited to 5 minutes at the start. Once games begin, no more warm-ups are allowed.</li>
+          <li style="font-size:13px;line-height:1.5;">Warm-up is limited to 5 minutes at the start and must be done only on your assigned court. Do not use new shuttlecocks for warm-up — use old/used ones only. Once games begin, no more warm-ups are allowed.</li>
           <li style="font-size:13px;line-height:1.5;">Each court is allotted 8 shuttlecocks (2 per player). Extra shuttlecocks must be provided by players.</li>
           <li style="font-size:13px;line-height:1.5;">Games are played to 21 points. First to reach 21 wins, even at 20-20. No deuce.</li>
           <li style="font-size:13px;line-height:1.5;">Scores are entered by one person per court after confirming with all players. The app shows exactly who plays who in each game (Game 1: A+B vs C+D · Game 2: A+C vs B+D · Game 3: A+D vs B+C).</li>
@@ -1955,7 +1955,7 @@ function renderCourts(){
         <div class="gym-wall">← Entrance Side →</div>
         <div class="gym-row">${[1,2,3].map(makeCourtCard).join('')}</div>
         <div style="height:10px;background:linear-gradient(90deg,transparent,rgba(0,153,204,0.08),transparent);border-radius:4px;margin:4px 0;"></div>
-        <div class="gym-row">${[4,5,6].map(makeCourtCard).join('')}</div>
+        <div class="gym-row">${[6,5,4].map(makeCourtCard).join('')}</div>
         <div class="gym-wall">← Back Wall →</div>
       </div>
       <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px;">Tap any court to see full details</div>`;
