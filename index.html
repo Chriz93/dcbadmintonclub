@@ -595,6 +595,7 @@ textarea.inp{resize:vertical;min-height:80px;}
   <div id="pos-standings"></div>
   <div class="ptabs">
     <button class="ptab active" onclick="showSec('standings','lb',this)">🏆 Leaders</button>
+    <button class="ptab" onclick="showSec('standings','rank',this)">🎯 Rankings</button>
     <button class="ptab" onclick="showSec('standings','pstats',this)">📊 Stats</button>
     <button class="ptab" onclick="showSec('standings','heat',this)">🔥 Heatmap</button>
     <button class="ptab" onclick="showSec('standings','hist',this)">📅 History</button>
@@ -602,6 +603,7 @@ textarea.inp{resize:vertical;min-height:80px;}
     <button class="ptab" onclick="showSec('standings','qa',this)">❓ Q&amp;A</button>
   </div>
   <div id="sec-lb" class="section active"></div>
+  <div id="sec-rank" class="section"></div>
   <div id="sec-pstats" class="section"></div>
   <div id="sec-heat" class="section"></div>
   <div id="sec-hist" class="section"></div>
@@ -932,7 +934,7 @@ async function loadAll(){
   try{
     const[pl,an,cur,sess]=await Promise.all([sbG('players'),sbG('announcements','order=created_at.desc'),getKV('current_session'),getKV('completed_sessions')]);
     const membershipOverrides=await getKV('membership_overrides')||{};
-    S.players=(pl||[]).map(p=>({id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:membershipOverrides[p.id]||p.membership_type||'regular',approved:p.approved===undefined?true:!!p.approved,registeredAt:p.registered_at||p.created_at||'',waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''}));
+    S.players=(pl||[]).map(p=>({id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed||!!p.sig,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:membershipOverrides[p.id]||p.membership_type||'regular',approved:p.approved===undefined?true:!!p.approved,registeredAt:p.registered_at||p.created_at||'',waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''}));
     S.announcements=an||[];
     S.current=cur||null;
     S.sessions=sess||[];
@@ -1371,7 +1373,8 @@ function renderAnnouncementsAdmin(){
 async function startSession(){
   if(S.current)return toast('Session already active','warn');
   const n=S.sessions.length+1;if(n>8)return toast('All 8 done!','warn');
-  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,assignments:autoAssign(),scores:{},movements:[],completed:false};
+  const cc={};for(let c=1;c<=NC;c++)cc[c]=1;
+  const sess={id:Date.now(),number:n,date:DATES[n-1],cycle:1,courtCycles:cc,assignments:autoAssign(),scores:{},movements:[],completed:false};
   await setKV('current_session',sess);await loadAll();renderAll();toast('Session '+n+' started!','success');
 }
 function autoAssign(){
@@ -1379,6 +1382,160 @@ function autoAssign(){
   const sorted=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
   sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);a[c].push(p.id);});
   return a;
+}
+// ── Per-Court Cycle Helpers ──
+function getCourtCycle(c){
+  if(!S.current)return 1;
+  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
+  return S.current.courtCycles[c]||1;
+}
+function isCourtDone(c){
+  if(!S.current)return false;
+  const cy=getCourtCycle(c);
+  const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
+  if(pids.length<2)return true; // skip courts with <2 players
+  const numGames=pids.length===3?3:NG;
+  for(let g=1;g<=numGames;g++){if(!S.current.scores[`c${c}_y${cy}_g${g}`])return false;}
+  return true;
+}
+function courtStats(c,cy){
+  const wins={},pts={},ptFor={},ptAgainst={},gpc={};
+  const pids=(S.current.assignments[c]||[]);
+  pids.forEach(id=>{wins[id]=0;pts[id]=0;ptFor[id]=0;ptAgainst[id]=0;gpc[id]=0;});
+  const numGames=pids.length===3?3:NG;
+  for(let g=1;g<=numGames;g++){
+    const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
+    const sa=[sc.a1,sc.a2].filter(x=>x!=null),sb=[sc.b1,sc.b2].filter(x=>x!=null);
+    if(sc.w==='A')sa.forEach(id=>{wins[id]=(wins[id]||0)+1;});
+    else if(sc.w==='B')sb.forEach(id=>{wins[id]=(wins[id]||0)+1;});
+    sa.forEach(id=>{pts[id]=(pts[id]||0)+sc.sA;ptFor[id]=(ptFor[id]||0)+sc.sA;ptAgainst[id]=(ptAgainst[id]||0)+sc.sB;gpc[id]=(gpc[id]||0)+1;});
+    sb.forEach(id=>{pts[id]=(pts[id]||0)+sc.sB;ptFor[id]=(ptFor[id]||0)+sc.sB;ptAgainst[id]=(ptAgainst[id]||0)+sc.sA;gpc[id]=(gpc[id]||0)+1;});
+  }
+  return{wins,pts,ptFor,ptAgainst,gpc};
+}
+function rankCourt(c,cy){
+  const pids=S.current.assignments[c]||[];
+  if(pids.length<2)return pids.map(id=>({id,mv:'stay'}));
+  const st=courtStats(c,cy);
+  const sorted=[...pids].sort((a,b)=>{
+    if(st.pts[b]!==st.pts[a])return st.pts[b]-st.pts[a];
+    const da=st.ptFor[a]-st.ptAgainst[a],db=st.ptFor[b]-st.ptAgainst[b];
+    if(da!==db)return db-da;
+    return a-b;
+  });
+  return sorted.map((id,i)=>({id,mv:i===0&&c>1?'up':i===sorted.length-1&&c<NC?'down':'stay'}));
+}
+async function advanceCourtPair(courtA,courtB){
+  if(!S.current)return;
+  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
+  const cyA=getCourtCycle(courtA),cyB=getCourtCycle(courtB);
+  // Rank both courts
+  const rankA=rankCourt(courtA,cyA);
+  const rankB=rankCourt(courtB,cyB);
+  const stA=courtStats(courtA,cyA);
+  const stB=courtStats(courtB,cyB);
+  // Find who moves: courtA's loser goes down, courtB's winner goes up
+  const moverDown=courtA<courtB?rankA.find(r=>r.mv==='down'):rankB.find(r=>r.mv==='down');
+  const moverUp=courtA<courtB?rankB.find(r=>r.mv==='up'):rankA.find(r=>r.mv==='up');
+  const upperCourt=Math.min(courtA,courtB),lowerCourt=Math.max(courtA,courtB);
+  // Build movement record
+  const mv={};
+  rankA.forEach(r=>mv[r.id]=r.mv);
+  rankB.forEach(r=>mv[r.id]=r.mv);
+  // Perform the swap in assignments
+  const a=S.current.assignments;
+  if(moverDown&&moverUp){
+    a[upperCourt]=a[upperCourt].filter(id=>id!==moverDown.id);
+    a[lowerCourt]=a[lowerCourt].filter(id=>id!==moverUp.id);
+    a[lowerCourt].push(moverDown.id);
+    a[upperCourt].push(moverUp.id);
+  }
+  // Record movements
+  S.current.movements.push({cycle:cyA,courts:[courtA,courtB],mv,wins:{...stA.wins,...stB.wins},pts:{...stA.pts,...stB.pts}});
+  // Update DB stats for both courts' players
+  const updates=[];
+  [stA,stB].forEach(st=>{
+    Object.entries(st.wins).forEach(([id,w])=>{
+      const pid=parseInt(id);const p=S.players.find(x=>x.id===pid);if(!p)return;
+      const played=st.gpc[pid]||0;if(played===0)return;
+      updates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
+    });
+  });
+  if(updates.length)await Promise.all(updates);
+  // Advance both courts' cycles
+  S.current.courtCycles[courtA]=cyA+1;
+  S.current.courtCycles[courtB]=cyB+1;
+  // Update global cycle to max of all court cycles (for backward compat)
+  S.current.cycle=Math.max(...Object.values(S.current.courtCycles));
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  toast(`Courts ${courtA} & ${courtB} advanced to Round ${cyA+1}!`,'success');
+}
+async function advanceSingleEdgeCourt(court){
+  // For Court 1 (no court above) or Court NC (no court below) when they only need self
+  if(!S.current)return;
+  if(!S.current.courtCycles){S.current.courtCycles={};for(let i=1;i<=NC;i++)S.current.courtCycles[i]=S.current.cycle||1;}
+  const cy=getCourtCycle(court);
+  const ranked=rankCourt(court,cy);
+  const st=courtStats(court,cy);
+  const mv={};ranked.forEach(r=>mv[r.id]=r.mv);
+  // Edge courts: winner of C1 stays, loser of C6 stays — no swap needed with neighbor
+  // But we still need the neighbor to finish for the swap to happen
+  // This function should only be called when the court is truly edge-only (C1 winner stays, C6 loser stays)
+  // The actual swap with neighbor is handled by advanceCourtPair
+  // So this is only for the case where a court has NO movement (all stay) — which only happens if court=1 and all stay, or court=NC and all stay
+  S.current.movements.push({cycle:cy,courts:[court],mv,wins:{...st.wins},pts:{...st.pts}});
+  const updates=[];
+  Object.entries(st.wins).forEach(([id,w])=>{
+    const pid=parseInt(id);const p=S.players.find(x=>x.id===pid);if(!p)return;
+    const played=st.gpc[pid]||0;if(played===0)return;
+    updates.push(sbU('players',pid,{season_wins:p.seasonWins+w,season_losses:p.seasonLosses+(played-w),games_played:p.gamesPlayed+played}));
+  });
+  if(updates.length)await Promise.all(updates);
+  S.current.courtCycles[court]=cy+1;
+  S.current.cycle=Math.max(...Object.values(S.current.courtCycles));
+  await setKV('current_session',S.current);
+  await loadAll();renderAll();
+  toast(`Court ${court} advanced to Round ${cy+1}!`,'success');
+}
+async function tryAdvanceCourt(court){
+  if(!S.current)return;
+  const cy=getCourtCycle(court);
+  if(cy>=NCYC)return toast(`Court ${court} has completed all ${NCYC} rounds`,'warn');
+  if(!isCourtDone(court))return toast(`Court ${court} still has unfinished games`,'warn');
+  const ranked=rankCourt(court,cy);
+  const winner=ranked.find(r=>r.mv==='up');
+  const loser=ranked.find(r=>r.mv==='down');
+  // Determine which neighbor courts need to be ready
+  const needsAbove=winner&&court>1; // winner moves to court-1
+  const needsBelow=loser&&court<NC; // loser moves to court+1
+  if(needsAbove&&!isCourtDone(court-1)){
+    toast(`Waiting for Court ${court-1} to finish Round ${getCourtCycle(court-1)} before swapping`,'warn');return;
+  }
+  if(needsBelow&&!isCourtDone(court+1)){
+    toast(`Waiting for Court ${court+1} to finish Round ${getCourtCycle(court+1)} before swapping`,'warn');return;
+  }
+  // Check neighbor cycles match (both should be on same round to swap)
+  if(needsAbove&&getCourtCycle(court-1)!==cy){
+    toast(`Court ${court-1} is on a different round — wait for sync`,'warn');return;
+  }
+  if(needsBelow&&getCourtCycle(court+1)!==cy){
+    toast(`Court ${court+1} is on a different round — wait for sync`,'warn');return;
+  }
+  // Advance with neighbors
+  if(needsAbove&&needsBelow){
+    // Middle court: need both neighbors. Advance with upper first, then lower
+    await advanceCourtPair(court-1,court);
+    // After first swap, check if lower neighbor still needs swap
+    if(isCourtDone(court+1)&&getCourtCycle(court)===getCourtCycle(court+1)){
+      // This gets complex — for now, advance one pair at a time
+    }
+    return;
+  }
+  if(needsAbove){await advanceCourtPair(court-1,court);return;}
+  if(needsBelow){await advanceCourtPair(court,court+1);return;}
+  // No neighbors needed (all players stay) — just advance this court
+  await advanceSingleEdgeCourt(court);
 }
 async function nextCycle(){
   if(!S.current)return toast('No active session','warn');
@@ -1392,6 +1549,9 @@ async function nextCycle(){
   }
   if(missing.length&&!confirm(`Missing ${missing.length} scores. Proceed?`))return;
   await applyRotation();S.current.cycle++;
+  // Update all courtCycles to match
+  if(!S.current.courtCycles)S.current.courtCycles={};
+  for(let c=1;c<=NC;c++)S.current.courtCycles[c]=S.current.cycle;
   await setKV('current_session',S.current);await loadAll();renderAll();toast('Round '+S.current.cycle+'!','success');
 }
 async function applyRotation(){
@@ -1959,14 +2119,15 @@ function buildCombos(players){
 }
 function computeRoundStatus(){
   if(!S.current)return{courts:{},projectedMv:{},projectedAssignments:null,allScored:false};
-  const cy=S.current.cycle,a=S.current.assignments;
+  const a=S.current.assignments;
   const courts={};
   const wins={},pts={},ptFor={},ptAgainst={};
   S.players.forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;});
   let totalScored=0,totalCourts=0;
   for(let c=1;c<=NC;c++){
+    const cy=getCourtCycle(c); // per-court cycle
     const pids=(a[c]||[]).filter(id=>S.players.find(p=>p.id===id));
-    if(pids.length<2){courts[c]={scored:false,players:0,skip:true};continue;}
+    if(pids.length<2){courts[c]={scored:false,players:0,skip:true,courtCycle:cy};continue;}
     totalCourts++;
     const numGames=pids.length===3?3:NG;
     let gamesScored=0;
@@ -1996,7 +2157,7 @@ function computeRoundStatus(){
       courtWinner=sorted[0];
       courtLoser=sorted[sorted.length-1];
     }
-    courts[c]={scored:allDone,gamesScored,numGames,players:pids.length,winner:courtWinner,loser:courtLoser,pids};
+    courts[c]={scored:allDone,gamesScored,numGames,players:pids.length,winner:courtWinner,loser:courtLoser,pids,courtCycle:cy};
   }
   // Compute projected movements
   const projectedMv={};
@@ -2111,18 +2272,14 @@ function renderRoundTracker(){
   }
 
   // ── Current Round Progress ──
+  const minCy=Math.min(...Object.values(S.current.courtCycles||{1:cy}));
+  const maxCy=Math.max(...Object.values(S.current.courtCycles||{1:cy}));
   html+=`<div class="card" style="margin-bottom:12px;">
-    <div class="card-title">📊 Round ${cy} ${cy<=NCYC?'Progress':''}${cy>NCYC?' (Final)':''}</div>
-    <div style="display:flex;gap:4px;margin-bottom:10px;">`;
-  for(let r=1;r<=NCYC;r++){
-    const isDone=r<cy;const isActive=r===cy;
-    html+=`<div style="flex:1;height:6px;border-radius:3px;background:${isDone?'var(--green)':isActive?'var(--teal2)':'var(--s3)'};${isActive?'animation:glow 1.2s ease-in-out infinite alternate;':''}"></div>`;
-  }
-  html+=`</div>`;
-  // Court status grid
-  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
+    <div class="card-title">📊 Court Progress${minCy===maxCy?` — Round ${minCy}`:` — Rounds ${minCy}–${maxCy}`}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">`;
   for(let c=1;c<=NC;c++){
     const cs=status.courts[c];
+    const ccyc=getCourtCycle(c);
     if(!cs||cs.skip){
       html+=`<div style="background:var(--s3);border-radius:8px;padding:8px;text-align:center;opacity:0.5;">
         <div style="font-size:11px;font-weight:800;color:var(--muted);">C${c}</div>
@@ -2135,10 +2292,11 @@ function renderRoundTracker(){
     const winnerP=cs.winner?S.players.find(p=>p.id===cs.winner):null;
     const loserP=cs.loser?S.players.find(p=>p.id===cs.loser):null;
     html+=`<div style="background:${bg};border:${border};border-radius:8px;padding:8px;text-align:center;">
-      <div style="font-size:11px;font-weight:800;color:${done?'var(--green2)':'var(--muted)'};">C${c} ${done?'✅':'⏳'}</div>
+      <div style="font-size:11px;font-weight:800;color:${done?'var(--green2)':'var(--muted)'};">C${c} R${ccyc} ${done?'✅':'⏳'}</div>
       <div style="font-size:9px;color:var(--muted);">${cs.gamesScored||0}/${cs.numGames} games</div>
       ${done&&winnerP?`<div style="font-size:9px;margin-top:3px;">${c>1?`<span style="color:var(--green2);">↑${esc(winnerP.name.split(' ')[0])}</span>`:`<span style="color:var(--muted);">👑${esc(winnerP.name.split(' ')[0])}</span>`}</div>`:''}
       ${done&&loserP?`<div style="font-size:9px;">${c<NC?`<span style="color:var(--red2);">↓${esc(loserP.name.split(' ')[0])}</span>`:`<span style="color:var(--muted);">⬇️Stay</span>`}</div>`:''}
+      ${done&&ccyc<NCYC?`<div style="margin-top:4px;"><button class="btn btn-warn btn-sm" style="padding:3px 8px;font-size:9px;" onclick="tryAdvanceCourt(${c})">⏭ Advance</button></div>`:''}
     </div>`;
   }
   html+=`</div>`;
@@ -2219,19 +2377,7 @@ function renderScoreEntry(){
   const court=parseInt(document.getElementById('sc-sel').value);
   const el=document.getElementById('score-area');if(!court){el.innerHTML='';return;}
   if(!S.current){el.innerHTML='<div class="alert alert-warn">No active session. Ask admin to start one.</div>';return;}
-  const cy=S.current.cycle;
-  // ── Check if previous round needs to be advanced first ──
-  if(cy>1){
-    const prevRoundProcessed=(S.current.movements||[]).some(m=>m.cycle===cy-1);
-    if(!prevRoundProcessed){
-      el.innerHTML=`<div class="alert alert-warn" style="text-align:center;">
-        <div style="font-size:18px;margin-bottom:8px;">🔒</div>
-        <div style="font-weight:800;margin-bottom:4px;">Round ${cy-1} Not Yet Advanced</div>
-        <div style="font-size:12px;">Complete all Round ${cy-1} scores and ask the admin to click <strong>"Next Round"</strong> before entering Round ${cy} scores.</div>
-      </div>`;
-      return;
-    }
-  }
+  const cy=getCourtCycle(court);
   // ── Preserve unsaved score values before re-render ──
   const _unsaved={};
   for(let g=1;g<=3;g++){
@@ -2271,7 +2417,15 @@ function renderScoreEntry(){
       <button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%;" onclick="saveGameScore(${court},${g})">💾 Save Game ${g}</button>
     </div>`;
   });
-  html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button><div id="res-${court}" style="margin-top:10px;"></div>`;
+  html+=`<button class="btn btn-success" id="sbtn_${court}" onclick="saveScores(${court})">💾 Save All Court ${court} Scores</button>`;
+  // ── Advance button when all games scored ──
+  const courtDone=isCourtDone(court);
+  if(courtDone&&cy<NCYC){
+    html+=`<button class="btn btn-warn" style="margin-top:8px;" onclick="tryAdvanceCourt(${court})">⏭ Advance Court ${court} to Round ${cy+1}</button>`;
+  } else if(courtDone&&cy>=NCYC){
+    html+=`<div class="alert alert-success" style="margin-top:8px;text-align:center;font-weight:700;">✅ Court ${court} completed all ${NCYC} rounds!</div>`;
+  }
+  html+=`<div id="res-${court}" style="margin-top:10px;"></div>`;
   el.innerHTML=html;
   // ── Restore unsaved score values after re-render ──
   for(let g=1;g<=3;g++){
@@ -2401,6 +2555,65 @@ function renderLeaderboard(){
         <div class="lbnum"><div class="v">${wr}%</div><div class="l">Win%</div></div>
       </div></div>`;
   }).join('');
+}
+function renderRankings(){
+  const el=document.getElementById('sec-rank');if(!el)return;
+  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No players yet</div></div>';return;}
+  // Compute live scores for current round
+  const liveWins={},liveLosses={},livePts={};
+  S.players.forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;livePts[p.id]=0;});
+  if(S.current){
+    const cc=S.current.courtCycles||{};
+    for(let c=1;c<=NC;c++){
+      const cy=cc[c]||S.current.cycle||1;
+      const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
+      const numGames=pids.length===3?3:NG;
+      for(let g2=1;g2<=numGames;g2++){
+        const sc=S.current.scores[`c${c}_y${cy}_g${g2}`];if(!sc)continue;
+        const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
+        const side_b=[sc.b1,sc.b2].filter(x=>x!=null);
+        if(sc.w==='A'){side_a.forEach(id=>{liveWins[id]++;});side_b.forEach(id=>{liveLosses[id]++;});}
+        else if(sc.w==='B'){side_b.forEach(id=>{liveWins[id]++;});side_a.forEach(id=>{liveLosses[id]++;});}
+        side_a.forEach(id=>{livePts[id]=(livePts[id]||0)+sc.sA;});
+        side_b.forEach(id=>{livePts[id]=(livePts[id]||0)+sc.sB;});
+      }
+    }
+  }
+  // Composite ranking: court position (primary), total wins (secondary), win rate (tertiary), points (quaternary)
+  const ranked=[...S.players].map(p=>{
+    const totalW=p.seasonWins+(liveWins[p.id]||0);
+    const totalL=p.seasonLosses+(liveLosses[p.id]||0);
+    const totalGP=p.gamesPlayed+(liveWins[p.id]||0)+(liveLosses[p.id]||0);
+    const wr=totalGP>0?totalW/totalGP:0;
+    const pts=livePts[p.id]||0;
+    const rating=(NC-p.currentCourt+1)*1000+totalW*10+Math.round(wr*100);
+    return{...p,totalW,totalL,totalGP,wr:Math.round(wr*100),pts,rating};
+  }).sort((a,b)=>{
+    if(a.currentCourt!==b.currentCourt)return a.currentCourt-b.currentCourt;
+    if(b.totalW!==a.totalW)return b.totalW-a.totalW;
+    if(b.wr!==a.wr)return b.wr-a.wr;
+    return b.pts-a.pts;
+  });
+  let html=`<div class="card"><div class="card-title">🎯 Player Rankings</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Ranked by court position, wins, win rate, and points scored</div>`;
+  ranked.forEach((p,i)=>{
+    const courtCls=p.currentCourt===1?'var(--gold)':p.currentCourt===2?'var(--silver)':p.currentCourt===3?'var(--bronze)':'var(--teal2)';
+    const ratingColor=p.rating>=5000?'var(--gold)':p.rating>=4000?'var(--green2)':p.rating>=3000?'var(--teal2)':'var(--muted)';
+    html+=`<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
+      <div style="font-size:14px;font-weight:900;width:28px;text-align:center;flex-shrink:0;color:${i<3?courtCls:'var(--muted)'};">${i+1}</div>
+      ${avatar(p.name)}
+      <div class="lbinfo">
+        <div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}</div>
+        <div class="lbsub">Court ${p.currentCourt} · ${p.totalW}W ${p.totalL}L · ${p.wr}%</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:18px;font-weight:900;color:${ratingColor};">${p.rating}</div>
+        <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Rating</div>
+      </div>
+    </div>`;
+  });
+  html+=`</div>`;
+  el.innerHTML=html;
 }
 function computePlayerStreakAndImprovement(){
   // Returns {playerId: {streak, maxStreak, improvement, totalAbsences}}
@@ -2577,7 +2790,8 @@ async function regStep3(){
   const btn=document.getElementById('reg-btn-lf');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving...';
   try{
     const isRegular=regData.membershipType!=='spare';
-    await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,waiver_signed:true,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0,membership_type:regData.membershipType||'regular',approved:false,registered_at:new Date().toISOString(),waitlisted:regData.waitlisted||false,no_show_count:0});
+    const result=await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,waiver_sig:regData.waiverSig||'',waiver_signed:true,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0,membership_type:regData.membershipType||'regular',approved:false,registered_at:new Date().toISOString(),waitlisted:regData.waitlisted||false,no_show_count:0});
+    if(result?.code||result?.message){toast('Registration error: '+(result.message||'Unknown error'),'error');btn.disabled=false;btn.innerHTML='Submit Registration →';return;}
     localStorage.setItem('dcbc-email',regData.email);
     // Update success screen based on type
     const successMsg=document.getElementById('reg-success-msg');
@@ -3003,7 +3217,7 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function renderAll(){
   checkRegistrationStatus();
   renderHome();renderRegPage();renderCourts();renderRoundTracker();renderSchedule();
-  renderLeaderboard();renderPlayerStats();renderHeatmap();renderHistory();renderRSVP();renderQA();
+  renderLeaderboard();renderRankings();renderPlayerStats();renderHeatmap();renderHistory();renderRSVP();renderQA();
   renderPOS('pos-standings');
   if(adminUnlocked){renderAdminPlayers();renderRegPlayers();renderSessionAdmin();renderAssignUI();renderPayments();renderAnnouncementsAdmin();}
   // Skip score re-render during background sync to preserve unsaved input values
