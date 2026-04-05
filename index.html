@@ -933,8 +933,12 @@ function renderRSVP(){
 async function loadAll(){
   try{
     const[pl,an,cur,sess]=await Promise.all([sbG('players'),sbG('announcements','order=created_at.desc'),getKV('current_session'),getKV('completed_sessions')]);
-    const membershipOverrides=await getKV('membership_overrides')||{};
-    S.players=(pl||[]).map(p=>({id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed||!!p.sig,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:membershipOverrides[p.id]||p.membership_type||'regular',approved:p.approved===undefined?true:!!p.approved,registeredAt:p.registered_at||p.created_at||'',waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''}));
+    const[membershipOverrides,playerApprovals]=await Promise.all([getKV('membership_overrides'),getKV('player_approvals')]);
+    const mo=membershipOverrides||{},pa=playerApprovals||{};
+    S.players=(pl||[]).map(p=>{
+      const kv=pa[p.id]||{};
+      return{id:p.id,name:p.name,email:p.email||'',phone:p.phone||'',emergency:p.emergency||'',medical:p.medical||'',sig:p.sig||'',waiverSigned:p.waiver_signed||!!p.sig,paid:p.paid,currentCourt:p.current_court,highestCourt:p.highest_court,seasonWins:p.season_wins,seasonLosses:p.season_losses,gamesPlayed:p.games_played,membershipType:mo[p.id]||kv.membershipType||p.membership_type||'regular',approved:kv.approved!==undefined?kv.approved:(p.approved===undefined?true:!!p.approved),registeredAt:kv.registeredAt||p.registered_at||p.created_at||'',waitlisted:kv.waitlisted!==undefined?kv.waitlisted:!!p.waitlisted,noShowCount:p.no_show_count||0,adminNote:p.admin_note||''};
+    });
     S.announcements=an||[];
     S.current=cur||null;
     S.sessions=sess||[];
@@ -1120,12 +1124,14 @@ async function addPlayer(){
   if(S.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Player already exists','warn');return;}
   // NOTE: membership_type column may not exist in DB — do NOT include it in INSERT
   // We use KV store (membership_overrides) as the reliable source for membership type
-  let res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:true,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0,approved:true,no_show_count:0});
-  // If INSERT fails (e.g. approved/no_show_count columns missing), try minimal INSERT
+  let res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:true,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
   if(!res||res.code||res.message||!Array.isArray(res)){
-    res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',waiver_signed:false,paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
+    res=await sbP('players',{name,email:'',phone:'',emergency:'',medical:'',sig:'admin',paid:false,current_court:court,highest_court:court,season_wins:0,season_losses:0,games_played:0});
   }
   if(!res||res.code||res.message){toast('Error adding player — check DB connection','error');console.error('addPlayer error:',res);return;}
+  // Store approval in KV
+  const pid=res?.[0]?.id||res?.id;
+  if(pid){const approvals=await getKV('player_approvals')||{};approvals[pid]={approved:true,waitlisted:false,membershipType:mtype};await setKV('player_approvals',approvals);}
   // Store membership type in KV store (always reliable)
   if(Array.isArray(res)&&res[0]){
     const overrides=await getKV('membership_overrides')||{};
@@ -1283,7 +1289,9 @@ async function promoteFromWaitlist(id){
   const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted).length;
   if(regularCount>=24){toast('Still no open regular slots (24/24)','warn');return;}
   if(!confirm(`Promote ${p.name} off the waitlist to Regular member?`))return;
-  await sbU('players',id,{waitlisted:false,approved:true});
+  const approvals=await getKV('player_approvals')||{};
+  approvals[id]={...(approvals[id]||{}),approved:true,waitlisted:false};
+  await setKV('player_approvals',approvals);
   await loadAll();renderAll();toast(p.name+' promoted from waitlist!','success');
 }
 function regPlayerCard(p,showApprove){
@@ -1536,6 +1544,25 @@ async function tryAdvanceCourt(court){
   if(needsBelow){await advanceCourtPair(court,court+1);return;}
   // No neighbors needed (all players stay) — just advance this court
   await advanceSingleEdgeCourt(court);
+}
+async function autoAdvanceCheck(court){
+  if(!S.current)return;
+  const cy=getCourtCycle(court);
+  if(cy>=NCYC)return; // already at max rounds
+  if(!isCourtDone(court))return; // not all games scored yet
+  // Check if we can auto-advance this court with its neighbors
+  // A court can advance if both adjacent courts that need swapping are also done
+  const ranked=rankCourt(court,cy);
+  const winner=ranked.find(r=>r.mv==='up');
+  const loser=ranked.find(r=>r.mv==='down');
+  const needsAbove=winner&&court>1;
+  const needsBelow=loser&&court<NC;
+  // Check neighbors ready and on same cycle
+  if(needsAbove&&(!isCourtDone(court-1)||getCourtCycle(court-1)!==cy))return;
+  if(needsBelow&&(!isCourtDone(court+1)||getCourtCycle(court+1)!==cy))return;
+  // All conditions met — auto advance
+  toast(`Auto-advancing Court ${court}...`,'info');
+  await tryAdvanceCourt(court);
 }
 async function nextCycle(){
   if(!S.current)return toast('No active session','warn');
@@ -2466,6 +2493,8 @@ async function saveGameScore(court,gameNum){
   S.current.scores[key]={a1:combo.a1,a2:combo.a2,b1:combo.b1,b2:combo.b2,sA:sa,sB:sb,w:sa>sb?'A':sb>sa?'B':'T'};
   await setKV('current_session',S.current);
   renderScoreEntry();renderRoundTracker();renderLeaderboard();toast(`Game ${gameNum} saved!`,'success');
+  // Auto-advance if all games for this court are done
+  setTimeout(()=>autoAdvanceCheck(court),500);
 }
 
 async function saveScores(court){
@@ -2506,6 +2535,8 @@ async function saveScores(court){
   // Update round tracker after saving
   renderRoundTracker();
   renderScoreEntry();renderRoundTracker();renderLeaderboard();renderCourts();toast('Court '+court+' saved!','success');
+  // Auto-advance: if this court is fully scored, try to advance automatically
+  setTimeout(()=>autoAdvanceCheck(court),500);
 }
 
 // ══════════════════════════════════════════════
@@ -2790,8 +2821,20 @@ async function regStep3(){
   const btn=document.getElementById('reg-btn-lf');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving...';
   try{
     const isRegular=regData.membershipType!=='spare';
-    const result=await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,waiver_sig:regData.waiverSig||'',waiver_signed:true,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0,membership_type:regData.membershipType||'regular',approved:false,registered_at:new Date().toISOString(),waitlisted:regData.waitlisted||false,no_show_count:0});
-    if(result?.code||result?.message){toast('Registration error: '+(result.message||'Unknown error'),'error');btn.disabled=false;btn.innerHTML='Submit Registration →';return;}
+    // Try full insert first, fallback to minimal if columns missing
+    let result=await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,waiver_signed:true,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0});
+    if(result?.code||result?.message){
+      // Retry with even more minimal payload
+      result=await sbP('players',{name:regData.name,email:regData.email,phone:regData.phone,emergency:regData.emergency,medical:regData.medical,sig:sig,paid:false,current_court:isRegular?3:6,highest_court:isRegular?3:6,season_wins:0,season_losses:0,games_played:0});
+      if(result?.code||result?.message){toast('Registration error: '+(result.message||'Unknown error'),'error');btn.disabled=false;btn.innerHTML='Submit Registration →';return;}
+    }
+    // Store approval/waitlist/membership status in KV (works regardless of DB schema)
+    const playerId=result?.[0]?.id||result?.id;
+    if(playerId){
+      const approvals=await getKV('player_approvals')||{};
+      approvals[playerId]={approved:false,waitlisted:regData.waitlisted||false,membershipType:regData.membershipType||'regular',registeredAt:new Date().toISOString(),waiverSig:regData.waiverSig||''};
+      await setKV('player_approvals',approvals);
+    }
     localStorage.setItem('dcbc-email',regData.email);
     // Update success screen based on type
     const successMsg=document.getElementById('reg-success-msg');
@@ -2807,15 +2850,19 @@ async function regStep3(){
 }
 async function approvePlayer(id){
   const p=S.players.find(x=>x.id===id);if(!p)return;
+  const approvals=await getKV('player_approvals')||{};
   if(p.membershipType!=='spare'&&!p.waitlisted){
     const regularCount=S.players.filter(x=>x.membershipType!=='spare'&&!x.waitlisted&&x.approved&&x.id!==id).length;
     if(regularCount>=24){
       if(!confirm('⚠️ Regular slots are FULL (24/24). Approve this player and add to WAITLIST instead?'))return;
-      await sbU('players',id,{approved:true,waitlisted:true});
+      approvals[id]={...(approvals[id]||{}),approved:true,waitlisted:true};
+      await setKV('player_approvals',approvals);
       await loadAll();renderAll();toast('Approved (waitlisted — regular slots full)','warn');return;
     }
   }
-  await sbU('players',id,{approved:true});await loadAll();renderAll();toast('Player approved!','success');
+  approvals[id]={...(approvals[id]||{}),approved:true,waitlisted:false};
+  await setKV('player_approvals',approvals);
+  await loadAll();renderAll();toast('Player approved!','success');
 }
 async function rejectPlayer(id){
   const p=S.players.find(x=>x.id===id);
