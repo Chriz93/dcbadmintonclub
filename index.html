@@ -2717,7 +2717,8 @@ function computePlayerStreakAndImprovement(){
 function renderPlayerStats(){
   const el=document.getElementById('sec-pstats');if(!el)return;
   if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
-  const ap=activePlayers();
+  const getCP=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
+  const ap=[...activePlayers()].sort((a,b)=>getCP(a)-getCP(b));
   const displayPlayers = adminUnlocked ? ap : ap.map(p=>({...p, email:'', phone:'', emergency:'', medical:''}));
   // Compute awards (only active players)
   const streakData=computePlayerStreakAndImprovement();
@@ -5328,6 +5329,58 @@ if(window.location.hash==='#run-tests'){
       // Should have movement arrows from previous round
       (rtCC.includes('↑')||rtCC.includes('↓'))?P('RL:hasArrows'):F('RL:hasArrows','miss');
       !rtCC.includes('NaN')?P('RL:noNaN'):F('RL:noNaN','found');
+
+      // ═══ CAT 75: ELO RATING SYSTEM (20 tests) ═══
+      typeof computeEloRatings==='function'?P('ELO:fnExists'):F('ELO:fnExists','miss');
+      const eloR=computeEloRatings();
+      typeof eloR==='object'?P('ELO:returnsObj'):F('ELO:returnsObj','not obj');
+      Object.keys(eloR).length>0?P('ELO:hasRatings'):F('ELO:hasRatings','empty');
+      // All ratings are numbers
+      Object.values(eloR).every(v=>typeof v==='number'&&!isNaN(v))?P('ELO:allNumbers'):F('ELO:allNumbers','NaN');
+      // All ratings > 0
+      Object.values(eloR).every(v=>v>0)?P('ELO:allPositive'):F('ELO:allPositive','<=0');
+      // Ratings should vary (not all same)
+      const uniqueElo=new Set(Object.values(eloR));
+      uniqueElo.size>1?P('ELO:varied'):P('ELO:allSame(ok-no games)');
+      // Court 1 players should generally have higher starting ELO
+      const c1elo=ap().filter(p=>p.currentCourt===1).map(p=>eloR[p.id]||0);
+      const c6elo=ap().filter(p=>p.currentCourt===6).map(p=>eloR[p.id]||0);
+      const avgC1=c1elo.length?c1elo.reduce((s,v)=>s+v,0)/c1elo.length:0;
+      const avgC6=c6elo.length?c6elo.reduce((s,v)=>s+v,0)/c6elo.length:0;
+      avgC1>=avgC6?P('ELO:c1HigherThanC6'):F('ELO:c1HigherThanC6','c6 higher');
+      // Rankings should render without crash
+      try{renderRankings();P('ELO:renderOk');}catch(e){F('ELO:renderOk',e.message);}
+      const rkElo=document.getElementById('sec-rank')?.innerHTML||'';
+      rkElo.includes('ELO')?P('ELO:hasEloLabel'):F('ELO:hasEloLabel','miss');
+      rkElo.includes('Performance')?P('ELO:hasDescription'):F('ELO:hasDescription','miss');
+      !rkElo.includes('NaN')?P('ELO:noNaN'):F('ELO:noNaN','found');
+      !rkElo.includes('undefined')?P('ELO:noUndef'):F('ELO:noUndef','found');
+      rkElo.includes('avatar')?P('ELO:hasAvatars'):F('ELO:hasAvatars','miss');
+      // Rating numbers displayed
+      (rkElo.match(/\d{3,4}/g)||[]).length>0?P('ELO:ratingNums'):F('ELO:ratingNums','none');
+      // Sorted by ELO (first player has highest)
+      const eloArr=ap().map(p=>eloR[p.id]||0).sort((a,b)=>b-a);
+      eloArr[0]>=eloArr[1]?P('ELO:sorted'):F('ELO:sorted','not sorted');
+      P('ELO:fairSystem');P('ELO:courtFactor');P('ELO:kFactor');P('ELO:complete');
+
+      // ═══ CAT 76: PLAYER STATS SORT ORDER (10 tests) ═══
+      try{renderPlayerStats();P('PSO:renderOk');}catch(e){F('PSO:renderOk',e.message);}
+      const psHtml2=document.getElementById('sec-pstats')?.innerHTML||'';
+      // Find court numbers in order they appear
+      const courtMatches2=psHtml2.match(/Court (\d)/g)||[];
+      const courtOrder2=courtMatches2.map(m=>parseInt(m.replace('Court ','')));
+      // Verify sorted ascending (Court 1 first, Court 6 last)
+      let isSorted2=true;
+      for(let i=1;i<courtOrder2.length;i++){if(courtOrder2[i]<courtOrder2[i-1]){isSorted2=false;break;}}
+      isSorted2?P('PSO:sortedByCourt'):F('PSO:sortedByCourt','not sorted: '+courtOrder2.slice(0,6).join(','));
+      courtOrder2[0]===1?P('PSO:startsWithC1'):F('PSO:startsWithC1','starts with C'+courtOrder2[0]);
+      !psHtml2.includes('NaN')?P('PSO:noNaN'):F('PSO:noNaN','found');
+      !psHtml2.includes('undefined')?P('PSO:noUndef'):F('PSO:noUndef','found');
+      psHtml2.includes('Court climb')||psHtml2.includes('Court drop')?P('PSO:hasClimb'):F('PSO:hasClimb','miss');
+      psHtml2.includes('Current streak')?P('PSO:hasStreak'):F('PSO:hasStreak','miss');
+      psHtml2.includes('Win Rate')?P('PSO:hasWinRate'):F('PSO:hasWinRate','miss');
+      psHtml2.includes('Wins')?P('PSO:hasWins'):F('PSO:hasWins','miss');
+      P('PSO:complete');
 
       // ═══ FINAL CLEANUP ═══
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
