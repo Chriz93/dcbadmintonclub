@@ -773,6 +773,8 @@ let S={players:[],sessions:[],current:null,announcements:[],lastUndo:null,votes:
 let adminUnlocked=false;
 let courtView='gym';
 let regData={};
+// Active players = those with court assignments (admin-added). Excludes registered-but-unassigned (court=0).
+function activePlayers(){return S.players.filter(p=>p.currentCourt>0);}
 
 // ══════════════════════════════════════════════
 // LOAD
@@ -1303,8 +1305,10 @@ function regPlayerCard(p,showApprove){
     <div class="flex-between" style="margin-bottom:6px;">
       <div style="font-weight:800;font-size:13px;">${esc(p.name)}${isSpare?'<span class="spare-badge">SPARE</span>':''}</div>
       <div style="display:flex;gap:5px;">
-        <span class="tag ${p.paid?'tg-green':'tg-yellow'}">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
-        ${showApprove?`<button class="btn btn-success btn-sm" onclick="approvePlayer(${p.id})" style="padding:4px 8px;">✓ Approve</button><button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>`:''}
+        <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;" onclick="togglePaid(${p.id})">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
+        ${showApprove?`<button class="btn btn-success btn-sm" onclick="approvePlayer(${p.id})" style="padding:4px 8px;">✓ Approve</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="editRegistration(${p.id})" style="padding:4px 8px;">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>
       </div>
     </div>
     <div style="font-size:11px;color:var(--teal2);margin-bottom:4px;">📧 ${esc(p.email)}</div>
@@ -1392,7 +1396,7 @@ async function startSession(){
 }
 function autoAssign(){
   const a={};for(let c=1;c<=NC;c++)a[c]=[];
-  const sorted=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
+  const sorted=[...activePlayers()].sort((x,y)=>x.currentCourt-y.currentCourt);
   sorted.forEach((p,i)=>{const c=Math.min(Math.floor(i/4)+1,NC);a[c].push(p.id);});
   return a;
 }
@@ -1454,7 +1458,7 @@ async function nextCycle(){
 }
 async function applyRotation(){
   const cy=S.current.cycle,a=S.current.assignments,wins={},pts={},ptFor={},ptAgainst={},gamesPlayedCycle={};
-  S.players.forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;gamesPlayedCycle[p.id]=0;});
+  activePlayers().forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;gamesPlayedCycle[p.id]=0;});
   for(let c=1;c<=NC;c++)for(let g=1;g<=NG;g++){
     const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
     // Handle both doubles (a2/b2 present) and singles (a2/b2 null)
@@ -1507,7 +1511,7 @@ async function endSession(){
   const cy=S.current.cycle;
   const alreadyProcessed=S.current.movements.some(m=>m.cycle===cy);
   const finalWins={},finalGamesPlayed={},finalPts={},finalPtFor={},finalPtAgainst={};
-  S.players.forEach(p=>{finalWins[p.id]=0;finalGamesPlayed[p.id]=0;finalPts[p.id]=0;finalPtFor[p.id]=0;finalPtAgainst[p.id]=0;});
+  activePlayers().forEach(p=>{finalWins[p.id]=0;finalGamesPlayed[p.id]=0;finalPts[p.id]=0;finalPtFor[p.id]=0;finalPtAgainst[p.id]=0;});
   for(let c=1;c<=NC;c++)for(let g=1;g<=NG;g++){
     const sc=S.current.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
     const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
@@ -1604,7 +1608,7 @@ async function cascadeFillCourt(fromCourt){
 async function rebalancePlayerCourts(){
   // Works with or without an active session — updates DB current_court values directly
   if(!confirm('Re-sort all courts? Players will be redistributed 4-per-court based on their current court ranking.'))return;
-  const sorted=[...S.players].sort((a,b)=>a.currentCourt-b.currentCourt);
+  const sorted=[...activePlayers()].sort((a,b)=>a.currentCourt-b.currentCourt);
   const updates=[];
   sorted.forEach((p,i)=>{
     const newCourt=Math.min(Math.floor(i/4)+1,NC);
@@ -1666,7 +1670,7 @@ function renderSessionAdmin(){
       <div style="margin-bottom:10px;">
         <select class="inp" id="late-player-sel" style="margin-bottom:6px;">
           <option value="">— Select Player —</option>
-          ${S.players.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          ${activePlayers().map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
         </select>
         <button class="btn btn-primary" onclick="markPlayerLate()">Mark Late</button>
       </div>
@@ -1680,7 +1684,7 @@ function renderSessionAdmin(){
     <div class="card"><div class="card-title">🚨 Missing Player — Cascade Fill</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">If a player doesn't show up, remove them from their court then cascade-fill from the court below. Last courts with 2–3 players will play singles.</div>
       <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Step 1 — Remove absent player from court:</div>
-      <select class="inp" id="absent-player-sel" style="margin-bottom:6px;"><option value="">— Select absent player —</option>${S.players.map(p=>`<option value="${p.id}|${p.currentCourt}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}</select>
+      <select class="inp" id="absent-player-sel" style="margin-bottom:6px;"><option value="">— Select absent player —</option>${activePlayers().map(p=>`<option value="${p.id}|${p.currentCourt}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}</select>
       <button class="btn btn-danger" onclick="handleAbsentPlayer()">🚫 Remove from Court</button>
       <div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin:10px 0 6px;">Step 2 — Cascade fill short courts:</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
@@ -1818,7 +1822,7 @@ function showCourtAddPlayer(court){
     <label class="lbl">Select Player</label>
     <select class="inp" id="modal-player-sel">
       <option value="">— Choose —</option>
-      ${S.players.map(p=>`<option value="${p.id}">${esc(p.name)} (C${p.currentCourt})</option>`).join('')}
+      ${activePlayers().map(p=>`<option value="${p.id}">${esc(p.name)} (C${p.currentCourt})</option>`).join('')}
     </select>
     <button class="btn btn-primary" onclick="quickAddToCourt(${court})">Add to Court ${court}</button>`);
 }
@@ -2021,7 +2025,7 @@ function computeRoundStatus(){
   const a=S.current.assignments;
   const courts={};
   const wins={},pts={},ptFor={},ptAgainst={};
-  S.players.forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;});
+  activePlayers().forEach(p=>{wins[p.id]=0;pts[p.id]=0;ptFor[p.id]=0;ptAgainst[p.id]=0;});
   let totalScored=0,totalCourts=0;
   const cy=S.current.cycle;
   for(let c=1;c<=NC;c++){
@@ -2422,10 +2426,10 @@ async function saveScores(court){
 // ══════════════════════════════════════════════
 function renderLeaderboard(){
   const el=document.getElementById('sec-lb');if(!el)return;
-  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">🏆</div><div class="em">No players yet</div></div>';return;}
+  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">🏆</div><div class="em">No active players yet</div></div>';return;}
   // Compute current round wins/losses from live scores
   const liveWins={},liveLosses={};
-  S.players.forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;});
+  activePlayers().forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;});
   if(S.current){
     const cy=S.current.cycle;
     for(let c=1;c<=NC;c++){
@@ -2441,8 +2445,8 @@ function renderLeaderboard(){
     }
   }
   const hasLive=Object.values(liveWins).some(v=>v>0);
-  const sorted=[...S.players].sort((a,b)=>{
-    const totalW_a=a.seasonWins+liveWins[a.id],totalW_b=b.seasonWins+liveWins[b.id];
+  const sorted=[...activePlayers()].sort((a,b)=>{
+    const totalW_a=a.seasonWins+(liveWins[a.id]||0),totalW_b=b.seasonWins+(liveWins[b.id]||0);
     if(totalW_b!==totalW_a)return totalW_b-totalW_a;
     const gp_a=a.gamesPlayed+liveWins[a.id]+liveLosses[a.id],gp_b=b.gamesPlayed+liveWins[b.id]+liveLosses[b.id];
     const wr_a=gp_a>0?totalW_a/gp_a:0,wr_b=gp_b>0?totalW_b/gp_b:0;
@@ -2467,10 +2471,10 @@ function renderLeaderboard(){
 }
 function renderRankings(){
   const el=document.getElementById('sec-rank');if(!el)return;
-  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No players yet</div></div>';return;}
+  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No active players yet</div></div>';return;}
   // Compute live scores for current round
   const liveWins={},liveLosses={},livePts={};
-  S.players.forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;livePts[p.id]=0;});
+  activePlayers().forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;livePts[p.id]=0;});
   if(S.current){
     for(let c=1;c<=NC;c++){
       const cy=S.current.cycle||1;
@@ -2488,7 +2492,7 @@ function renderRankings(){
     }
   }
   // Composite ranking: court position (primary), total wins (secondary), win rate (tertiary), points (quaternary)
-  const ranked=[...S.players].map(p=>{
+  const ranked=[...activePlayers()].map(p=>{
     const totalW=p.seasonWins+(liveWins[p.id]||0);
     const totalL=p.seasonLosses+(liveLosses[p.id]||0);
     const totalGP=p.gamesPlayed+(liveWins[p.id]||0)+(liveLosses[p.id]||0);
@@ -2558,13 +2562,14 @@ function computePlayerStreakAndImprovement(){
 }
 function renderPlayerStats(){
   const el=document.getElementById('sec-pstats');if(!el)return;
-  if(!S.players.length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
-  const displayPlayers = adminUnlocked ? S.players : S.players.map(p=>({...p, email:'', phone:'', emergency:'', medical:''}));
-  // Compute awards
+  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
+  const ap=activePlayers();
+  const displayPlayers = adminUnlocked ? ap : ap.map(p=>({...p, email:'', phone:'', emergency:'', medical:''}));
+  // Compute awards (only active players)
   const streakData=computePlayerStreakAndImprovement();
-  const mostImprovedId=S.players.reduce((best,p)=>(streakData[p.id]?.improvement||0)>(streakData[best]?.improvement||0)?p.id:best,S.players[0]?.id);
-  const mostConsistentId=S.players.reduce((best,p)=>(p.noShowCount||0)<(S.players.find(x=>x.id===best)?.noShowCount||0)?p.id:best,S.players[0]?.id);
-  const longestStreakId=S.players.reduce((best,p)=>(streakData[p.id]?.maxStreak||0)>(streakData[best]?.maxStreak||0)?p.id:best,S.players[0]?.id);
+  const mostImprovedId=ap.length?ap.reduce((best,p)=>(streakData[p.id]?.improvement||0)>(streakData[best]?.improvement||0)?p.id:best,ap[0].id):null;
+  const mostConsistentId=ap.length?ap.reduce((best,p)=>(p.noShowCount||0)<(ap.find(x=>x.id===best)?.noShowCount||0)?p.id:best,ap[0].id):null;
+  const longestStreakId=ap.length?ap.reduce((best,p)=>(streakData[p.id]?.maxStreak||0)>(streakData[best]?.maxStreak||0)?p.id:best,ap[0].id):null;
   // Awards banner
   let awardsHtml='';
   if(S.sessions.length>0){
@@ -2614,7 +2619,7 @@ function renderHeatmap(){
     <div style="display:flex;gap:4px;margin-bottom:10px;font-size:9px;color:var(--muted);">
       ${S.sessions.map(s=>`<div style="flex:1;text-align:center;">S${s.number}</div>`).join('')}
     </div>
-    ${S.players.map(p=>`<div class="heatmap-row">
+    ${activePlayers().map(p=>`<div class="heatmap-row">
       <div class="heatmap-name">${esc(p.name.split(' ')[0])}</div>
       <div class="heatmap-cells">
         ${S.sessions.map(s=>{
@@ -2744,7 +2749,31 @@ async function approvePlayer(id){
 async function rejectPlayer(id){
   const p=S.players.find(x=>x.id===id);
   if(!p||!confirm(`Remove ${p.name}'s registration? This cannot be undone.`))return;
-  await sbD('players',id);await loadAll();renderAll();toast('Registration removed','warn');
+  await sbD('players',id);
+  // Also remove from KV approvals
+  const approvals=await getKV('player_approvals')||{};delete approvals[id];await setKV('player_approvals',approvals);
+  await loadAll();renderAll();toast('Registration removed','warn');
+}
+function editRegistration(id){
+  const p=S.players.find(x=>x.id===id);if(!p)return;
+  const html=`
+    <label class="lbl">Name</label><input class="inp" id="edit-name" value="${esc(p.name)}">
+    <label class="lbl">Email</label><input class="inp" id="edit-email" value="${esc(p.email)}">
+    <label class="lbl">Phone</label><input class="inp" id="edit-phone" value="${esc(p.phone)}">
+    <label class="lbl">Emergency Contact</label><input class="inp" id="edit-emergency" value="${esc(p.emergency)}">
+    <label class="lbl">Medical Notes</label><textarea class="inp" id="edit-medical">${esc(p.medical)}</textarea>
+    <button class="btn btn-success" onclick="saveEditRegistration(${id})">Save Changes</button>`;
+  openModal('Edit Registration — '+p.name, html);
+}
+async function saveEditRegistration(id){
+  const name=document.getElementById('edit-name')?.value.trim();
+  const email=document.getElementById('edit-email')?.value.trim();
+  const phone=document.getElementById('edit-phone')?.value.trim();
+  const emergency=document.getElementById('edit-emergency')?.value.trim();
+  const medical=document.getElementById('edit-medical')?.value.trim();
+  if(!name||!email){toast('Name and email required','warn');return;}
+  await sbU('players',id,{name,email,phone,emergency,medical});
+  closeModal();await loadAll();renderAll();toast('Registration updated!','success');
 }
 function goRS(n){
   document.querySelectorAll('.reg-step').forEach(s=>s.classList.remove('active'));
@@ -2885,7 +2914,7 @@ function generateSeasonPDF(){
     const cols=[mg,mg+6,mg+60,mg+95,mg+115,mg+135,mg+158];
     ['#','Name','Membership','Wins','Losses','Win%','Best Court'].forEach((h,i)=>doc.text(h,cols[i],y));
     y+=lh;
-    const sorted=[...S.players].sort((a,b)=>b.seasonWins-a.seasonWins||(b.gamesPlayed>0?b.seasonWins/b.gamesPlayed:0)-(a.gamesPlayed>0?a.seasonWins/a.gamesPlayed:0));
+    const sorted=[...activePlayers()].sort((a,b)=>b.seasonWins-a.seasonWins||(b.gamesPlayed>0?b.seasonWins/b.gamesPlayed:0)-(a.gamesPlayed>0?a.seasonWins/a.gamesPlayed:0));
     doc.setFont(undefined,'normal');doc.setFontSize(9);
     sorted.forEach((p,i)=>{
       if(y>270){doc.addPage();y=mg;}
@@ -3181,7 +3210,21 @@ async function init(){
   await initInviteGate();
   setSS('syncing');
   const ok=await loadAll();
-  if(ok){setSS('ok');checkRegistrationStatus();renderAll();startSync();startRealtime();setInterval(renderHome,30000);registerServiceWorker();}
+  if(ok){
+    setSS('ok');
+    // Clean unassigned players from active session (safety net)
+    if(S.current){
+      const activeIds=new Set(activePlayers().map(p=>p.id));
+      let dirty=false;
+      for(let c=1;c<=NC;c++){
+        const before=(S.current.assignments[c]||[]).length;
+        S.current.assignments[c]=(S.current.assignments[c]||[]).filter(id=>activeIds.has(id));
+        if(S.current.assignments[c].length!==before)dirty=true;
+      }
+      if(dirty)setKV('current_session',S.current);
+    }
+    checkRegistrationStatus();renderAll();startSync();startRealtime();setInterval(renderHome,30000);registerServiceWorker();
+  }
   else{setSS('err');toast('Cannot connect to database','error');}
 }
 
