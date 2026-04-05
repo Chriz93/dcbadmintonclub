@@ -2566,58 +2566,96 @@ function renderLeaderboard(){
       </div></div>`;
   }).join('');
 }
+function computeEloRatings(){
+  // Performance-weighted ELO: winning on higher courts earns more, losing on lower costs more
+  const elo={};
+  // Starting ELO based on initial court: C1=1500, C2=1400, ..., C6=1000
+  activePlayers().forEach(p=>{elo[p.id]=1500-((p.currentCourt-1)*100);});
+  // Process all completed sessions
+  const allSess=[...S.sessions];
+  if(S.current)allSess.push(S.current);
+  allSess.forEach(sess=>{
+    (sess.movements||[]).forEach(mv=>{
+      const cycle=mv.cycle;
+      // For each court in this round, compute ELO changes
+      for(let c=1;c<=NC;c++){
+        const pids=(sess.assignments?.[c]||[]);
+        if(pids.length<2)continue;
+        // Court difficulty factor: higher court = harder = more reward
+        const courtFactor=(NC-c+1)/NC; // C1=1.0, C2=0.83, ..., C6=0.17
+        pids.forEach(pid=>{
+          const wins=mv.wins?.[pid]||0;
+          const pts=mv.pts?.[pid]||0;
+          if(wins===0&&pts===0)return; // didn't play
+          // Expected performance based on court level
+          const numGames=pids.length===3?2:3;
+          const expectedWinRate=0.5; // equal opponents
+          const actualWinRate=numGames>0?wins/numGames:0;
+          // K-factor scales with court difficulty
+          // Winning on Court 1 (hardest) = +25 per win above expected
+          // Winning on Court 6 (easiest) = +8 per win above expected
+          const K=8+Math.round(courtFactor*17); // ranges 8 to 25
+          const delta=Math.round(K*(actualWinRate-expectedWinRate)*numGames);
+          elo[pid]=(elo[pid]||1000)+delta;
+        });
+      }
+    });
+    // Also process current round's live scores for active session
+    if(sess===S.current){
+      const cy=sess.cycle;
+      for(let c=1;c<=NC;c++){
+        const pids=(sess.assignments[c]||[]);if(pids.length<2)continue;
+        const courtFactor=(NC-c+1)/NC;
+        const K=8+Math.round(courtFactor*17);
+        let courtWins={};pids.forEach(id=>courtWins[id]=0);
+        let gamesPlayed=0;
+        for(let g=1;g<=NG;g++){
+          const sc=sess.scores[`c${c}_y${cy}_g${g}`];if(!sc)continue;
+          gamesPlayed++;
+          const sa=[sc.a1,sc.a2].filter(x=>x!=null),sb=[sc.b1,sc.b2].filter(x=>x!=null);
+          if(sc.w==='A')sa.forEach(id=>{if(courtWins[id]!==undefined)courtWins[id]++;});
+          else if(sc.w==='B')sb.forEach(id=>{if(courtWins[id]!==undefined)courtWins[id]++;});
+        }
+        if(gamesPlayed===0)continue;
+        pids.forEach(pid=>{
+          const w=courtWins[pid]||0;
+          const wr=gamesPlayed>0?w/gamesPlayed:0;
+          elo[pid]=(elo[pid]||1000)+Math.round(K*(wr-0.5)*gamesPlayed);
+        });
+      }
+    }
+  });
+  return elo;
+}
 function renderRankings(){
   const el=document.getElementById('sec-rank');if(!el)return;
   if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No active players yet</div></div>';return;}
-  // Compute live scores for current round
-  const liveWins={},liveLosses={},livePts={};
-  activePlayers().forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;livePts[p.id]=0;});
-  if(S.current){
-    for(let c=1;c<=NC;c++){
-      const cy=S.current.cycle||1;
-      const pids=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id));
-      const numGames=pids.length===3?3:NG;
-      for(let g2=1;g2<=numGames;g2++){
-        const sc=S.current.scores[`c${c}_y${cy}_g${g2}`];if(!sc)continue;
-        const side_a=[sc.a1,sc.a2].filter(x=>x!=null);
-        const side_b=[sc.b1,sc.b2].filter(x=>x!=null);
-        if(sc.w==='A'){side_a.forEach(id=>{liveWins[id]++;});side_b.forEach(id=>{liveLosses[id]++;});}
-        else if(sc.w==='B'){side_b.forEach(id=>{liveWins[id]++;});side_a.forEach(id=>{liveLosses[id]++;});}
-        side_a.forEach(id=>{livePts[id]=(livePts[id]||0)+sc.sA;});
-        side_b.forEach(id=>{livePts[id]=(livePts[id]||0)+sc.sB;});
-      }
-    }
-  }
-  // Composite ranking: court position (primary), total wins (secondary), win rate (tertiary), points (quaternary)
+  const elo=computeEloRatings();
+  const getCourtPos2=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
   const ranked=[...activePlayers()].map(p=>{
-    const totalW=p.seasonWins+(liveWins[p.id]||0);
-    const totalL=p.seasonLosses+(liveLosses[p.id]||0);
-    const totalGP=p.gamesPlayed+(liveWins[p.id]||0)+(liveLosses[p.id]||0);
-    const wr=totalGP>0?totalW/totalGP:0;
-    const pts=livePts[p.id]||0;
-    const rating=(NC-p.currentCourt+1)*1000+totalW*10+Math.round(wr*100);
-    return{...p,totalW,totalL,totalGP,wr:Math.round(wr*100),pts,rating};
-  }).sort((a,b)=>{
-    if(a.currentCourt!==b.currentCourt)return a.currentCourt-b.currentCourt;
-    if(b.totalW!==a.totalW)return b.totalW-a.totalW;
-    if(b.wr!==a.wr)return b.wr-a.wr;
-    return b.pts-a.pts;
-  });
-  let html=`<div class="card"><div class="card-title">🎯 Player Rankings</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Ranked by court position, wins, win rate, and points scored</div>`;
+    const courtPos=getCourtPos2(p);
+    const totalW=p.seasonWins,totalL=p.seasonLosses;
+    const totalGP=p.gamesPlayed;
+    const wr=totalGP>0?Math.round(totalW/totalGP*100):0;
+    const rating=elo[p.id]||1000;
+    return{...p,courtPos,totalW,totalL,totalGP,wr,rating};
+  }).sort((a,b)=>b.rating-a.rating); // Sort purely by ELO rating
+  let html=`<div class="card"><div class="card-title">🎯 Player Rankings (ELO)</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Performance-weighted rating: winning on higher courts earns more. A lower-court player CAN out-rank a higher-court player through consistent wins.</div>`;
   ranked.forEach((p,i)=>{
-    const courtCls=p.currentCourt===1?'var(--gold)':p.currentCourt===2?'var(--silver)':p.currentCourt===3?'var(--bronze)':'var(--teal2)';
-    const ratingColor=p.rating>=5000?'var(--gold)':p.rating>=4000?'var(--green2)':p.rating>=3000?'var(--teal2)':'var(--muted)';
+    const ratingColor=p.rating>=1500?'var(--gold)':p.rating>=1300?'var(--green2)':p.rating>=1100?'var(--teal2)':'var(--muted)';
+    const courtCls=p.courtPos===1?'var(--gold)':p.courtPos===2?'var(--silver)':p.courtPos===3?'var(--bronze)':'var(--teal2)';
+    const trend=p.rating>=1500-(p.courtPos-1)*100+50?'📈':p.rating<=1500-(p.courtPos-1)*100-50?'📉':'';
     html+=`<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
-      <div style="font-size:14px;font-weight:900;width:28px;text-align:center;flex-shrink:0;color:${i<3?courtCls:'var(--muted)'};">${i+1}</div>
+      <div style="font-size:14px;font-weight:900;width:28px;text-align:center;flex-shrink:0;color:${i<3?'var(--gold)':'var(--muted)'};">${i+1}</div>
       ${avatar(p.name)}
       <div class="lbinfo">
-        <div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}</div>
-        <div class="lbsub">Court ${p.currentCourt} · ${p.totalW}W ${p.totalL}L · ${p.wr}%</div>
+        <div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${trend?' <span style="font-size:12px;">'+trend+'</span>':''}</div>
+        <div class="lbsub">Court ${p.courtPos} · ${p.totalW}W ${p.totalL}L · ${p.wr}%</div>
       </div>
       <div style="text-align:center;">
         <div style="font-size:18px;font-weight:900;color:${ratingColor};">${p.rating}</div>
-        <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Rating</div>
+        <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">ELO</div>
       </div>
     </div>`;
   });
