@@ -1477,7 +1477,13 @@ function regPlayerCard(p,showApprove){
       <div style="display:flex;gap:5px;">
         <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;" onclick="togglePaid(${p.id})">${p.paid?'✅ Paid':'⏳ Unpaid'}</span>
         ${showApprove?`<button class="btn btn-success btn-sm" onclick="approvePlayer(${p.id})" style="padding:4px 8px;">✓ Approve</button>`:''}
-        ${(()=>{const linkedTo=S.players.find(x=>x.id!==p.id&&x.sig===p.sig&&x.waiverSigned);return linkedTo?`<span class="tag tg-green" style="font-size:9px;">✅ Linked to ${esc(linkedTo.name.split(' ')[0])}</span>`:`<button class="btn btn-primary btn-sm" onclick="linkWaiverToPlayer(${p.id})" style="padding:4px 8px;">🔗 Link to Player</button>`;})()}
+        ${(()=>{
+          // Check if this player's waiver is linked: either they ARE on a court (self-linked), or another player has their sig
+          if(p.waiverSigned&&p.currentCourt>0)return '<span class="tag tg-green" style="font-size:9px;">✅ Active on Court '+p.currentCourt+'</span>';
+          const linkedTo=S.players.find(x=>x.id!==p.id&&x.sig===p.sig&&x.waiverSigned);
+          if(linkedTo)return '<span class="tag tg-green" style="font-size:9px;">✅ Linked to '+esc(linkedTo.name.split(' ')[0])+'</span>';
+          return '<button class="btn btn-primary btn-sm" onclick="linkWaiverToPlayer('+p.id+')" style="padding:4px 8px;">🔗 Link to Player</button>';
+        })()}
         <button class="btn btn-ghost btn-sm" onclick="editRegistration(${p.id})" style="padding:4px 8px;">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="rejectPlayer(${p.id})" style="padding:4px 8px;">✕</button>
       </div>
