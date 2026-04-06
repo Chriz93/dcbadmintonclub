@@ -87,8 +87,10 @@ textarea.inp{resize:vertical;min-height:80px;}
 .tg-gold{background:rgba(255,215,0,0.15);color:var(--gold);border:1px solid rgba(255,215,0,0.35);}
 
 /* TABS */
-.ptabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none;}
-.ptabs::-webkit-scrollbar{display:none;}
+.ptabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin;scrollbar-color:var(--s3) transparent;cursor:grab;}
+.ptabs::-webkit-scrollbar{height:4px;}
+.ptabs::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px;}
+.ptabs::-webkit-scrollbar-track{background:transparent;}
 .ptab{background:var(--s2);border:1px solid transparent;color:var(--muted);font-size:12px;font-weight:700;padding:7px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .ptab.active{background:var(--teal);color:#fff;}
 .section{display:none;}.section.active{display:block;}
@@ -1004,6 +1006,11 @@ function setView(v,el){
   renderCourts();
 }
 
+// Mouse drag scrolling for tabs
+document.addEventListener('mousedown',e=>{const t=e.target.closest('.ptabs');if(!t)return;t.style.cursor='grabbing';let startX=e.pageX,scrollL=t.scrollLeft;const move=e2=>{t.scrollLeft=scrollL-(e2.pageX-startX);};const up=()=>{t.style.cursor='grab';document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);};document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);});
+// Mouse wheel horizontal scroll for tabs
+document.addEventListener('wheel',e=>{const t=e.target.closest('.ptabs');if(!t)return;e.preventDefault();t.scrollLeft+=e.deltaY;},{passive:false});
+
 // ══════════════════════════════════════════════
 // ADMIN AUTH
 // ══════════════════════════════════════════════
@@ -1182,6 +1189,24 @@ async function addPlayer(){
 }
 async function removePlayer(id){if(!confirm('Remove this player?'))return;await sbD('players',id);await loadAll();renderAll();}
 async function togglePaid(id){const p=S.players.find(x=>x.id===id);if(!p)return;await sbU('players',id,{paid:!p.paid});await loadAll();renderAll();}
+async function togglePlayerPresence(id){
+  if(!S.current){toast('No active session — start a session first','warn');return;}
+  if(!S.current.attendance)S.current.attendance={};
+  const current=S.current.attendance[id];
+  // Cycle: unmarked → present → absent → unmarked
+  if(!current||current==='unmarked'){
+    S.current.attendance[id]='present';
+    toast('Marked present','success');
+  }else if(current==='present'){
+    S.current.attendance[id]='absent';
+    toast('Marked absent','warn');
+  }else{
+    delete S.current.attendance[id];
+    toast('Attendance cleared','info');
+  }
+  await setKV('current_session',S.current);
+  renderAll();
+}
 async function markAbsentFromPlayers(id){
   const p=S.players.find(x=>x.id===id);if(!p)return;
   if(!confirm(`Mark ${p.name} absent and move to bench?`))return;
@@ -1291,7 +1316,8 @@ function renderAdminPlayers(){
       <div style="font-size:10px;color:var(--muted);">${esc(p.email)||'—'} · C${p.currentCourt} · ${p.seasonWins}W ${p.seasonLosses}L · Absent:${p.noShowCount}</div>
     </div>
     <button class="notes-btn" onclick="openAdminNote(${p.id})">${noteIcon}</button>
-    <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;font-size:9px;" onclick="togglePaid(${p.id})">${p.paid?'✅':'⏳'}</span>
+    <span class="tag ${isAbsentInSess?'tg-red':S.current?.attendance?.[p.id]==='present'?'tg-green':'tg-gray'}" style="cursor:pointer;font-size:9px;" onclick="togglePlayerPresence(${p.id})" title="Toggle present/absent">${isAbsentInSess?'❌':S.current?.attendance?.[p.id]==='present'?'✅':'—'}</span>
+    <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;font-size:9px;" onclick="togglePaid(${p.id})" title="Toggle paid">${p.paid?'💰':'⏳'}</span>
     <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;font-size:10px;" onchange="setPlayerCourt(${p.id},this.value)">
       <option value="0">Bench</option>
       ${[1,2,3,4,5,6].map(c=>`<option value="${c}" ${p.currentCourt===c?'selected':''}>C${c}</option>`).join('')}
