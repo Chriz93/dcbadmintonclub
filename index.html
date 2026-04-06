@@ -6394,8 +6394,8 @@ if(window.location.hash==='#run-tests'){
       P('3P:singlesLabel');P('3P:undersizeWarning');P('3P:cascadeOption');P('3P:complete');
 
       // ═══ CAT 109: 2-PLAYER SINGLES SCORING (25) ═══
-      const p2=[{id:901,name:'TestA'},{id:902,name:'TestB'}];
-      const c2combos=buildCombos(p2);
+      const p2test=[{id:901,name:'TestA'},{id:902,name:'TestB'}];
+      const c2combos=buildCombos(p2test);
       c2combos.length===3?P('2P:3games'):F('2P:3games',c2combos.length);
       c2combos.every(c=>c.a2===null&&c.b2===null)?P('2P:allSingles'):F('2P:allSingles','not singles');
       c2combos.every(c=>c.a1===901&&c.b1===902)?P('2P:sameMatchup'):F('2P:sameMatchup','different');
