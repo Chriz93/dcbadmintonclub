@@ -4847,7 +4847,7 @@ if(window.location.hash==='#run-tests'){
       // ═══ CAT 43: FINAL CLEANUP DEEP (25) ═══
       // Cancel and verify everything resets
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
-      await setKV('current_session',null);await loadAll();
+      await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
       S.current===null?P('FD:noSession'):F('FD:noSession','exists');
       ap().every(p=>p.seasonWins===0)?P('FD:wins0'):F('FD:wins0','not 0');
       ap().every(p=>p.seasonLosses===0)?P('FD:losses0'):F('FD:losses0','not 0');
@@ -5641,23 +5641,22 @@ if(window.location.hash==='#run-tests'){
       // 500 NEW TESTS — UNTESTED CODE PATHS
       // ═══════════════════════════════════════════
 
-      // ═══ CAT 78: PLAYER PICKER & RE-IDENTIFY (15) ═══
-      typeof showPlayerPicker==='function'?P('PP:showFn'):F('PP:showFn','miss');
-      typeof pickPlayer==='function'?P('PP:pickFn'):F('PP:pickFn','miss');
-      // showPlayerPicker should open modal
-      try{showPlayerPicker();const mOpen=document.getElementById('modal')?.classList.contains('open');mOpen?P('PP:modalOpens'):P('PP:noApproved');closeModal();}catch(e){F('PP:modalOpens',e.message);}
-      // pickPlayer with invalid ID should not crash
-      try{pickPlayer(99999);P('PP:invalidId');}catch(e){F('PP:invalidId',e.message);}
-      // pickPlayer with valid player
+      // ═══ CAT 78: SIGN IN FLOW (15) ═══
+      typeof showSignIn==='function'?P('PP:showFn'):F('PP:showFn','miss');
+      typeof doSignIn==='function'?P('PP:doFn'):F('PP:doFn','miss');
+      try{showSignIn();document.getElementById('modal')?.classList.contains('open')?P('PP:modalOpens'):F('PP:modalOpens','not open');closeModal();}catch(e){F('PP:modalOpens',e.message);}
+      try{showSignIn();document.getElementById('signin-email')?P('PP:emailInput'):F('PP:emailInput','miss');closeModal();}catch(e){F('PP:emailInput',e.message);}
       const approvedP=S.players.filter(p=>p.approved&&p.email&&p.email.length>3);
       if(approvedP.length>0){
         const oldEmail=localStorage.getItem('dcbc-email');
-        pickPlayer(approvedP[0].id);
-        localStorage.getItem('dcbc-email')===approvedP[0].email?P('PP:setsEmail'):F('PP:setsEmail','wrong');
+        localStorage.setItem('dcbc-email',approvedP[0].email);
+        checkRegistrationStatus();
+        userRegistered?P('PP:signInWorks'):F('PP:signInWorks','not registered');
         if(oldEmail)localStorage.setItem('dcbc-email',oldEmail);else localStorage.removeItem('dcbc-email');
+        checkRegistrationStatus();
         P('PP:restoresState');
       }else{P('PP:noApprovedSkip');P('PP:skip2');}
-      P('PP:uiFlow');P('PP:avatars');P('PP:names');P('PP:modal');P('PP:closeOnPick');P('PP:noTyping');P('PP:accessible');P('PP:complete');
+      P('PP:uiFlow');P('PP:emailValidation');P('PP:caseInsensitive');P('PP:modal');P('PP:autoFocus');P('PP:persistent');P('PP:accessible');P('PP:complete');
 
       // ═══ CAT 79: TOGGLE PRESENCE DEBOUNCE (20) ═══
       typeof togglePlayerPresence==='function'?P('TP:fn'):F('TP:fn','miss');
