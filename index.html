@@ -1175,7 +1175,7 @@ async function addPlayer(){
   const mtype=g('np-membership')||'regular';
   if(!name){toast('Enter a name','warn');return;}
   if(mtype==='regular'){
-    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin').length;
     if(regularCount>=24){toast('Regular slots full (24/24). Please choose Spare.','warn');return;}
   }
   // Check if player exists as a registered (court=0) player — if so, activate them instead of creating new
@@ -1301,7 +1301,7 @@ async function toggleMembership(id,type){
   const p=S.players.find(x=>x.id===id);if(!p)return;
   if(type===p.membershipType)return; // no change
   if(type==='regular'){
-    const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted&&x.id!==id).length;
+    const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted&&x.sig&&x.sig!=='admin'&&x.id!==id).length;
     if(regularCount>=24){toast('Regular slots full (24/24). Cannot switch to Regular.','warn');return;}
   }
   // Primary: store in KV override (works regardless of DB schema)
@@ -1414,7 +1414,7 @@ function renderRegPlayers(){
   const waitlisted=selfReg.filter(p=>p.waitlisted);
   const pending=selfReg.filter(p=>!p.approved&&!p.waitlisted);
   const approved=selfReg.filter(p=>p.approved&&!p.waitlisted);
-  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin').length;
   const spareCount=S.players.filter(p=>p.membershipType==='spare').length;
   let html=`<div class="card"><div class="card-title">📊 Summary</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
@@ -1460,7 +1460,7 @@ function renderRegPlayers(){
 }
 async function promoteFromWaitlist(id){
   const p=S.players.find(x=>x.id===id);if(!p)return;
-  const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted).length;
+  const regularCount=S.players.filter(x=>x.membershipType==='regular'&&!x.waitlisted&&x.sig&&x.sig!=='admin').length;
   if(regularCount>=24){toast('Still no open regular slots (24/24)','warn');return;}
   if(!confirm(`Promote ${p.name} off the waitlist to Regular member?`))return;
   const approvals=await getKV('player_approvals')||{};
@@ -3006,7 +3006,7 @@ function regStep1(){
   const type=regData.membershipType||'regular';
   // Check regular capacity — allow waitlist if full
   if(type==='regular'){
-    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+    const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin').length;
     if(regularCount>=24){
       if(!confirm('Regular slots are FULL (24/24). You will be added to the WAITLIST and notified if a spot opens. Continue?'))return;
       regData.waitlisted=true;
@@ -3070,7 +3070,7 @@ async function approvePlayer(id){
   const p=S.players.find(x=>x.id===id);if(!p)return;
   const approvals=await getKV('player_approvals')||{};
   if(p.membershipType!=='spare'&&!p.waitlisted){
-    const regularCount=S.players.filter(x=>x.membershipType!=='spare'&&!x.waitlisted&&x.approved&&x.id!==id).length;
+    const regularCount=S.players.filter(x=>x.membershipType!=='spare'&&!x.waitlisted&&x.approved&&x.sig&&x.sig!=='admin'&&x.id!==id).length;
     if(regularCount>=24){
       if(!confirm('⚠️ Regular slots are FULL (24/24). Approve this player and add to WAITLIST instead?'))return;
       approvals[id]={...(approvals[id]||{}),approved:true,waitlisted:true};
@@ -3168,7 +3168,7 @@ function goRS(n){
 function renderRegPage(){
   const myEmail=localStorage.getItem('dcbc-email'),already=document.getElementById('reg-already'),form=document.getElementById('reg-form');
   // Update capacity display (exclude waitlisted from count — they don't hold active slots)
-  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+  const regularCount=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin').length;
   const slotsEl=document.getElementById('reg-slots-text');
   if(slotsEl){
     const remaining=24-regularCount;
