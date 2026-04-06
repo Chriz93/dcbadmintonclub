@@ -1769,9 +1769,113 @@ async function endSession(){
   S.current.completed=true;
   // Store last cycle movement data (include mv and pts so arrows display correctly)
   if(!alreadyProcessed) S.current.movements.push({cycle:cy,mv:finalMv,wins:{...finalWins},pts:{...finalPts}});
+  // Build session summary BEFORE saving
+  const summary=buildSessionSummary(S.current);
   await setKV('completed_sessions',[...S.sessions,JSON.parse(JSON.stringify(S.current))]);
   await setKV('current_session',null);
-  await loadAll();renderAll();toast('Session saved! 🏸','success');
+  await loadAll();renderAll();
+  // Show summary modal
+  showSessionSummary(summary);
+}
+function buildSessionSummary(sess){
+  if(!sess)return null;
+  const sm={number:sess.number,date:sess.date,rounds:sess.movements.length+(sess.completed?1:0),totalScores:Object.keys(sess.scores).length};
+  // Players who participated
+  const playerIds=new Set(Object.values(sess.assignments).flat());
+  sm.players=S.players.filter(p=>playerIds.has(p.id)).map(p=>({id:p.id,name:p.name,court:0,wins:p.seasonWins,losses:p.seasonLosses,gp:p.gamesPlayed}));
+  // Final court assignments
+  sm.courts={};
+  for(let c=1;c<=NC;c++){
+    sm.courts[c]=(sess.assignments[c]||[]).map(id=>{
+      const p=S.players.find(x=>x.id===id);
+      return p?{name:p.name,wins:p.seasonWins,losses:p.seasonLosses}:{name:'?',wins:0,losses:0};
+    });
+  }
+  // Round-by-round movements
+  sm.movements=(sess.movements||[]).map(m=>({
+    cycle:m.cycle,
+    up:Object.entries(m.mv||{}).filter(([,d])=>d==='up').map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name.split(' ')[0]||'?'),
+    down:Object.entries(m.mv||{}).filter(([,d])=>d==='down').map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name.split(' ')[0]||'?')
+  }));
+  // Bird distribution
+  sm.birds=sess.birdDistribution||{};
+  // Attendance
+  const att=sess.attendance||{};
+  sm.absent=Object.entries(att).filter(([,s])=>s==='absent').map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name||'?');
+  return sm;
+}
+function showSessionSummary(sm){
+  if(!sm)return;
+  let html=`<div style="max-height:70vh;overflow-y:auto;">
+    <div style="text-align:center;margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:900;">Session ${sm.number} Complete! 🏸</div>
+      <div style="font-size:12px;color:var(--muted);">${sm.date} · ${sm.rounds} Rounds · ${sm.totalScores} Games</div>
+    </div>`;
+  // Final Court Assignments
+  html+=`<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin:10px 0 6px;">Final Court Assignments</div>`;
+  for(let c=1;c<=NC;c++){
+    const cls=c===1?'var(--gold)':c===2?'var(--silver)':c===3?'var(--bronze)':'var(--teal2)';
+    const players=sm.courts[c]||[];
+    html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:4px;">
+      <span style="font-weight:800;color:${cls};">Court ${c}</span>: ${players.map(p=>`${esc(p.name.split(' ')[0])} <span style="color:var(--teal2);font-size:10px;">${p.wins}W</span>`).join(' · ')}
+    </div>`;
+  }
+  // Round-by-round movements
+  if(sm.movements.length>0){
+    html+=`<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin:10px 0 6px;">Round Movements</div>`;
+    sm.movements.forEach(m=>{
+      html+=`<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border);">
+        <strong>R${m.cycle}:</strong> <span style="color:var(--green2);">↑${m.up.join(', ')||'none'}</span> · <span style="color:var(--red2);">↓${m.down.join(', ')||'none'}</span>
+      </div>`;
+    });
+  }
+  // Bird distribution
+  const birdEntries=Object.entries(sm.birds);
+  if(birdEntries.length>0){
+    html+=`<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal);margin:10px 0 6px;">🪶 Shuttlecock Distribution</div>`;
+    birdEntries.forEach(([c,bd])=>{
+      const recip=(bd.recipients||[]).map(r=>{const p=S.players.find(x=>x.id===r.playerId);return(p?p.name.split(' ')[0]:'?')+'('+r.birdsReceived+'🪶)';});
+      html+=`<div style="font-size:11px;padding:2px 0;">C${c}: ${recip.join(', ')}</div>`;
+    });
+  }
+  // Absent players
+  if(sm.absent.length>0){
+    html+=`<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--red2);margin:10px 0 6px;">Absent (Demoted)</div>`;
+    html+=`<div style="font-size:11px;color:var(--red2);">${sm.absent.join(', ')}</div>`;
+  }
+  // Copy summary button
+  html+=`<button class="messenger-btn" style="margin-top:12px;" onclick="copySessionSummary()">💬 Copy Summary for Messenger</button>`;
+  html+=`</div>`;
+  openModal('Session Summary',html);
+  // Store for copy
+  window._lastSessionSummary=sm;
+}
+function copySessionSummary(){
+  const sm=window._lastSessionSummary;if(!sm)return;
+  let text=`🏸 DC Badminton Club\nSession ${sm.number} — ${sm.date}\n${sm.rounds} Rounds · ${sm.totalScores} Games\n\n`;
+  text+=`📊 FINAL COURTS:\n`;
+  for(let c=1;c<=NC;c++){
+    const medal=c===1?'🥇':c===2?'🥈':c===3?'🥉':'';
+    const players=(sm.courts[c]||[]).map(p=>p.name.split(' ')[0]+'('+p.wins+'W)');
+    text+=`${medal}C${c}: ${players.join(', ')}\n`;
+  }
+  if(sm.movements.length>0){
+    text+=`\n🔄 MOVEMENTS:\n`;
+    sm.movements.forEach(m=>{text+=`R${m.cycle}: ⬆️${m.up.join(',')||'—'} ⬇️${m.down.join(',')||'—'}\n`;});
+  }
+  const birdEntries=Object.entries(sm.birds);
+  if(birdEntries.length>0){
+    text+=`\n🪶 BIRDS:\n`;
+    birdEntries.forEach(([c,bd])=>{
+      const recip=(bd.recipients||[]).map(r=>{const p=S.players.find(x=>x.id===r.playerId);return(p?p.name.split(' ')[0]:'?')+'('+r.birdsReceived+')';});
+      text+=`C${c}: ${recip.join(', ')}\n`;
+    });
+  }
+  if(sm.absent.length>0)text+=`\n❌ Absent: ${sm.absent.join(', ')}\n`;
+  text+=`\n🏆 See standings: chriz93.github.io/dcbadmintonclub`;
+  navigator.clipboard.writeText(text).then(()=>toast('Summary copied! Paste in Messenger','success')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Copied!','success');
+  });
 }
 async function cancelSession(){
   if(!confirm('Cancel session? All scores and stats from this session will be lost.'))return;
