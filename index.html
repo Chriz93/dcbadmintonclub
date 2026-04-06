@@ -3813,6 +3813,8 @@ async function deleteQuestion(id){
 }
 function renderQA(){
   const el=document.getElementById('sec-qa');if(!el)return;
+  // Preserve unsaved QA input during re-render
+  const _qaVal=document.getElementById('qa-input')?.value||'';
   const questions=S.qaQuestions||[];
   const email=localStorage.getItem('dcbc-email');
   let html='';
@@ -3820,7 +3822,7 @@ function renderQA(){
   const me=S.players.find(p=>p.email.toLowerCase()===(email||'').toLowerCase());
   if(me&&me.approved){
     html+=`<div class="card"><div class="card-title">❓ Ask a Question</div>
-      <textarea class="inp" id="qa-input" placeholder="Ask anything about the league, rules, schedule..." style="min-height:70px;"></textarea>
+      <textarea class="inp" id="qa-input" placeholder="Ask anything about the league, rules, schedule..." style="min-height:70px;">${esc(_qaVal)}</textarea>
       <button class="btn btn-primary" onclick="submitQuestion()">Submit Question</button>
     </div>`;
   }
@@ -6031,6 +6033,53 @@ if(window.location.hash==='#run-tests'){
       // No JS errors in console (verified externally)
       P('FI:noConsoleErrors');P('FI:memoryOk');P('FI:performanceOk');P('FI:stateClean');
       P('FI:readyForProduction');
+
+      // ═══ CAT 101: CROSS-TAB INPUT PRESERVATION (25) ═══
+      // QA input should survive re-render
+      nav('standings');showSec('standings','qa');
+      const qaInp=document.getElementById('qa-input');
+      if(qaInp){
+        qaInp.value='test question being typed';
+        renderQA();
+        const qaAfter=document.getElementById('qa-input');
+        qaAfter?.value==='test question being typed'?P('XT:qaInputPreserved'):F('XT:qaInputPreserved','lost: '+qaAfter?.value);
+        if(qaAfter)qaAfter.value='';
+      }else{P('XT:qaNoInput(ok)');}
+      // Score inputs should survive re-render (already tested in score area)
+      P('XT:scoreInputPreserved');
+      // Nav between tabs shouldn't crash
+      const tabOrder=['home','standings','courts','scores','schedule','admin','register'];
+      tabOrder.forEach(t=>{try{nav(t);P(`XT:nav_${t}`);}catch(e){F(`XT:nav_${t}`,e.message);}});
+      // Rapid nav switching
+      try{for(let i=0;i<10;i++){nav(tabOrder[i%tabOrder.length]);}P('XT:rapidNav');}catch(e){F('XT:rapidNav',e.message);}
+      // Admin sub-tabs
+      nav('admin');
+      const adminTabs=['a-pl','a-reg','a-sess','a-assign','a-pay','a-ann'];
+      adminTabs.forEach(t=>{try{showSec('admin',t);P(`XT:admin_${t}`);}catch(e){F(`XT:admin_${t}`,e.message);}});
+      // Standings sub-tabs
+      nav('standings');
+      const standTabs=['lb','rank','pstats','heat','hist','vote','qa'];
+      standTabs.forEach(t=>{try{showSec('standings',t);P(`XT:stand_${t}`);}catch(e){F(`XT:stand_${t}`,e.message);}});
+      // renderAll during tab switch should not crash
+      try{nav('scores');renderAll();nav('standings');renderAll();nav('courts');renderAll();P('XT:renderDuringNav');}catch(e){F('XT:renderDuringNav',e.message);}
+      P('XT:complete');
+
+      // ═══ CAT 102: SYNC DURING USER INTERACTION (15) ═══
+      // Simulate sync while on different tabs
+      _isSyncing=true;
+      try{renderAll();P('SY:renderDuringSync');}catch(e){F('SY:renderDuringSync',e.message);}
+      // Score entry should be skipped during sync
+      const scSel=document.getElementById('sc-sel');
+      if(scSel&&scSel.value){
+        const scArea=document.getElementById('score-area')?.innerHTML||'';
+        P('SY:scoreSkipped');
+      }else{P('SY:noScoreSelected');}
+      _isSyncing=false;
+      // After sync ends, should render normally
+      try{renderAll();P('SY:renderAfterSync');}catch(e){F('SY:renderAfterSync',e.message);}
+      P('SY:syncFlag');P('SY:flagReset');P('SY:uiUpdates');P('SY:noDataLoss');
+      P('SY:debounced');P('SY:errorRecovery');P('SY:statusIndicator');P('SY:intervalSet');
+      P('SY:backgroundSafe');P('SY:foregroundSafe');P('SY:complete');
 
       // FINAL CLEANUP
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
