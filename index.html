@@ -847,6 +847,21 @@ function checkRegistrationStatus(){
   }
   updateNavVisibility();
 }
+// Allow player to re-identify if localStorage was lost
+function reIdentify(){
+  const email=prompt('Enter your registered email address:');
+  if(!email||!email.includes('@'))return;
+  const me=S.players.find(p=>p.email.toLowerCase()===email.trim().toLowerCase());
+  if(me&&me.approved){
+    localStorage.setItem('dcbc-email',email.trim().toLowerCase());
+    checkRegistrationStatus();renderAll();
+    toast('Welcome back, '+me.name+'!','success');
+  }else if(me&&!me.approved){
+    toast('Your registration is pending admin approval','warn');
+  }else{
+    toast('Email not found — please register first','warn');
+  }
+}
 
 function updateNavVisibility(){
   const register = document.getElementById('bnav-register');
@@ -1081,7 +1096,8 @@ function renderHome(){
         <button class="btn btn-ghost" style="margin:0;" onclick="nav('standings')">🏆 Standings</button>
         <button class="btn btn-ghost" style="margin:0;" onclick="nav('schedule')">📅 Schedule</button>`;
     }else{
-      qab.innerHTML=`<button class="btn btn-primary" style="margin:0;grid-column:span 2;" onclick="nav('register')">📋 Register Now to Access All Features</button>`;
+      qab.innerHTML=`<button class="btn btn-primary" style="margin:0;grid-column:span 2;" onclick="nav('register')">📋 Register Now to Access All Features</button>
+        <button class="btn btn-ghost" style="margin:0;grid-column:span 2;" onclick="reIdentify()">🔑 Already registered? Sign in with email</button>`;
     }
   }
   const cd=document.getElementById('countdown');
@@ -1190,25 +1206,30 @@ async function addPlayer(){
 }
 async function removePlayer(id){if(!confirm('Remove this player?'))return;await sbD('players',id);await loadAll();renderAll();}
 async function togglePaid(id){const p=S.players.find(x=>x.id===id);if(!p)return;await sbU('players',id,{paid:!p.paid});await loadAll();renderAll();}
+let _attSaveTimer=null;
 async function togglePlayerPresence(id){
-  // Works with or without active session — stores in KV for pre-session confirmation
+  const p=S.players.find(x=>x.id===id);
   if(S.current){
     if(!S.current.attendance)S.current.attendance={};
-    const current=S.current.attendance[id];
-    if(!current||current==='unmarked'){S.current.attendance[id]='present';toast('Marked present','success');}
-    else if(current==='present'){S.current.attendance[id]='absent';toast('Marked absent','warn');}
-    else{delete S.current.attendance[id];toast('Attendance cleared','info');}
-    await setKV('current_session',S.current);
+    const cur=S.current.attendance[id];
+    if(!cur||cur==='unmarked'){S.current.attendance[id]='present';}
+    else if(cur==='present'){S.current.attendance[id]='absent';}
+    else{delete S.current.attendance[id];}
   }else{
-    // Pre-session attendance — store in KV
-    const preAtt=await getKV('pre_session_attendance')||{};
-    const current=preAtt[id];
-    if(!current||current==='unmarked'){preAtt[id]='present';toast('Confirmed present','success');}
-    else if(current==='present'){preAtt[id]='absent';toast('Marked absent','warn');}
-    else{delete preAtt[id];toast('Cleared','info');}
-    await setKV('pre_session_attendance',preAtt);
+    if(!S.preAttendance)S.preAttendance={};
+    const cur=S.preAttendance[id];
+    if(!cur||cur==='unmarked'){S.preAttendance[id]='present';}
+    else if(cur==='present'){S.preAttendance[id]='absent';}
+    else{delete S.preAttendance[id];}
   }
-  renderAll();
+  // Instant UI update — just re-render admin players (fast)
+  renderAdminPlayers();
+  // Debounce the save — batch multiple clicks into one network request
+  clearTimeout(_attSaveTimer);
+  _attSaveTimer=setTimeout(async()=>{
+    if(S.current){await setKV('current_session',S.current);}
+    else{await setKV('pre_session_attendance',S.preAttendance);}
+  },1000);
 }
 async function markAbsentFromPlayers(id){
   const p=S.players.find(x=>x.id===id);if(!p)return;
@@ -3015,8 +3036,8 @@ async function approvePlayer(id){
 }
 function linkWaiverToPlayer(regId){
   const regP=S.players.find(x=>x.id===regId);if(!regP)return;
-  // Show modal with ALL admin-added players (court + spare pool) to link to
-  const allAdminPlayers=S.players.filter(p=>p.sig==='admin'&&p.id!==regId);
+  // Show modal with ALL other players as possible link targets
+  const allAdminPlayers=S.players.filter(p=>p.id!==regId);
   const html=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
     Link <strong>${esc(regP.name)}</strong>'s waiver & registration data to an existing player.
     This transfers waiver signature, contact info, and marks the player as waiver-signed.
