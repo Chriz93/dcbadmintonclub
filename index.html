@@ -1903,16 +1903,18 @@ function renderSessionAdmin(){
         <div style="margin-top:6px;font-size:11px;color:var(--muted);">Court sizes: ${[1,2,3,4,5,6].map(c=>`C${c}:${(S.current.assignments[c]||[]).length}`).join(' ')}</div>
       </div>
     </div>
-    <div class="card"><div class="card-title">🪶 Bird Distribution</div>
+    <div class="card"><div class="card-title">🪶 Shuttlecock Distribution</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Each court started with 8 birds. Enter how many are left on each court. Top scorers on each court take home the remaining birds.</div>
       <div>${[1,2,3,4,5,6].map(c=>`
         <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;">
-          <label style="width:120px;font-size:12px;">Court ${c}:</label>
-          <input type="number" class="inp" id="birds_${c}" min="0" value="0" style="width:60px;padding:4px;">
-          <span style="font-size:11px;color:var(--muted);">remaining</span>
+          <label style="width:80px;font-size:12px;font-weight:700;">Court ${c}:</label>
+          <input type="number" class="inp" id="birds_${c}" min="0" max="8" value="0" style="width:60px;padding:4px;">
+          <span style="font-size:10px;color:var(--muted);">of 8 remaining</span>
         </div>
       `).join('')}
       </div>
-      <button class="btn btn-primary" onclick="distributeBirds()" style="margin-top:10px;width:100%;">🪶 Distribute Birds</button>
+      <button class="btn btn-primary" onclick="distributeBirds()" style="margin-top:10px;width:100%;">🪶 Distribute to Top Scorers</button>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;">1 bird = top scorer · 2 = top 2 · 3 = top 3 · 4 = 1 each · 5+ = top gets extras</div>
     </div>
     <div class="card"><div class="card-title">✅ Attendance Marking</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Mark who actually showed up today. An unexcused absence moves the player one court down at the start of next session.</div>
@@ -3767,13 +3769,21 @@ async function distributeBirds(){
       else if(sc.w==='B')sb.forEach(id=>{if(playerWins[id]!==undefined)playerWins[id]++;});
     });
     const ranked=[...pids].sort((a,b)=>(playerWins[b]||0)-(playerWins[a]||0));
-    // Distribute: top N players get 1 bird each, if more birds than players, top player gets extras
+    // Distribute within THIS court only:
+    // 1 bird=top scorer, 2=top 2, 3=top 3, 4=all get 1
+    // 5+=top scorer gets extras, rest get 1 each
     const recipients=[];
     let remaining=cnt;
+    // First pass: 1 bird each to top scorers
     for(let i=0;i<ranked.length&&remaining>0;i++){
-      const give=i===0?Math.max(1,remaining-Math.min(ranked.length-1,remaining-1)):1;
-      recipients.push({playerId:ranked[i],birdsReceived:give});
-      remaining-=give;
+      recipients.push({playerId:ranked[i],birdsReceived:1});
+      remaining--;
+    }
+    // Second pass: remaining birds go to top scorer(s)
+    let ri=0;
+    while(remaining>0&&recipients.length>0){
+      recipients[ri%recipients.length].birdsReceived++;
+      remaining--;ri++;
     }
     bd[c]={recipients,total:cnt};
   }
