@@ -970,6 +970,7 @@ async function loadAll(){
     S.sessions=sess||[];
     if(S.current){S.votes=await getKV(`votes_session_${S.current.number}`)||{};S.rsvp=await getKV(`rsvp_session_${S.current.number}`)||{};}
     S.qaQuestions=await getKV('qa_questions')||[];
+    S.preAttendance=await getKV('pre_session_attendance')||{};
     return true;
   }catch(e){return false;}
 }
@@ -1190,21 +1191,23 @@ async function addPlayer(){
 async function removePlayer(id){if(!confirm('Remove this player?'))return;await sbD('players',id);await loadAll();renderAll();}
 async function togglePaid(id){const p=S.players.find(x=>x.id===id);if(!p)return;await sbU('players',id,{paid:!p.paid});await loadAll();renderAll();}
 async function togglePlayerPresence(id){
-  if(!S.current){toast('No active session — start a session first','warn');return;}
-  if(!S.current.attendance)S.current.attendance={};
-  const current=S.current.attendance[id];
-  // Cycle: unmarked → present → absent → unmarked
-  if(!current||current==='unmarked'){
-    S.current.attendance[id]='present';
-    toast('Marked present','success');
-  }else if(current==='present'){
-    S.current.attendance[id]='absent';
-    toast('Marked absent','warn');
+  // Works with or without active session — stores in KV for pre-session confirmation
+  if(S.current){
+    if(!S.current.attendance)S.current.attendance={};
+    const current=S.current.attendance[id];
+    if(!current||current==='unmarked'){S.current.attendance[id]='present';toast('Marked present','success');}
+    else if(current==='present'){S.current.attendance[id]='absent';toast('Marked absent','warn');}
+    else{delete S.current.attendance[id];toast('Attendance cleared','info');}
+    await setKV('current_session',S.current);
   }else{
-    delete S.current.attendance[id];
-    toast('Attendance cleared','info');
+    // Pre-session attendance — store in KV
+    const preAtt=await getKV('pre_session_attendance')||{};
+    const current=preAtt[id];
+    if(!current||current==='unmarked'){preAtt[id]='present';toast('Confirmed present','success');}
+    else if(current==='present'){preAtt[id]='absent';toast('Marked absent','warn');}
+    else{delete preAtt[id];toast('Cleared','info');}
+    await setKV('pre_session_attendance',preAtt);
   }
-  await setKV('current_session',S.current);
   renderAll();
 }
 async function markAbsentFromPlayers(id){
@@ -1308,7 +1311,8 @@ function renderAdminPlayers(){
   const sortedPlayers=[...activePlayers].sort((a,b)=>a.currentCourt-b.currentCourt);
   sortedPlayers.forEach((p,i)=>{
     const noteIcon=p.adminNote?'📝':'📋';
-    const isAbsentInSess=S.current?.attendance?.[p.id]==='absent';
+    const attStatus=S.current?.attendance?.[p.id]||S.preAttendance?.[p.id]||'';
+    const isAbsentInSess=attStatus==='absent';
     html+=`<div style="display:flex;align-items:center;gap:6px;padding:9px 0;border-bottom:1px solid var(--border);${isAbsentInSess?'opacity:0.5;':''}">
     <div class="pl-num">${i+1}</div>
     <div style="flex:1;min-width:0;">
@@ -1316,7 +1320,7 @@ function renderAdminPlayers(){
       <div style="font-size:10px;color:var(--muted);">${esc(p.email)||'—'} · C${p.currentCourt} · ${p.seasonWins}W ${p.seasonLosses}L · Absent:${p.noShowCount}</div>
     </div>
     <button class="notes-btn" onclick="openAdminNote(${p.id})">${noteIcon}</button>
-    <span class="tag ${isAbsentInSess?'tg-red':S.current?.attendance?.[p.id]==='present'?'tg-green':'tg-gray'}" style="cursor:pointer;font-size:9px;" onclick="togglePlayerPresence(${p.id})" title="Toggle present/absent">${isAbsentInSess?'❌':S.current?.attendance?.[p.id]==='present'?'✅':'—'}</span>
+    <span class="tag ${attStatus==='absent'?'tg-red':attStatus==='present'?'tg-green':'tg-gray'}" style="cursor:pointer;font-size:9px;" onclick="togglePlayerPresence(${p.id})" title="Toggle present/absent">${attStatus==='absent'?'❌':attStatus==='present'?'✅':'—'}</span>
     <span class="tag ${p.paid?'tg-green':'tg-yellow'}" style="cursor:pointer;font-size:9px;" onclick="togglePaid(${p.id})" title="Toggle paid">${p.paid?'💰':'⏳'}</span>
     <select style="background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;font-size:10px;" onchange="setPlayerCourt(${p.id},this.value)">
       <option value="0">Bench</option>
@@ -3011,15 +3015,15 @@ async function approvePlayer(id){
 }
 function linkWaiverToPlayer(regId){
   const regP=S.players.find(x=>x.id===regId);if(!regP)return;
-  // Show modal with active players to link to
-  const courtPlayers=activePlayers();
+  // Show modal with ALL admin-added players (court + spare pool) to link to
+  const allAdminPlayers=S.players.filter(p=>p.sig==='admin'&&p.id!==regId);
   const html=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
-    Link <strong>${esc(regP.name)}</strong>'s waiver & registration data to an existing player on court.
+    Link <strong>${esc(regP.name)}</strong>'s waiver & registration data to an existing player.
     This transfers waiver signature, contact info, and marks the player as waiver-signed.
   </div>
   <select class="inp" id="link-target-select">
     <option value="">— Select Player —</option>
-    ${courtPlayers.map(p=>`<option value="${p.id}">${esc(p.name)} (Court ${p.currentCourt})</option>`).join('')}
+    ${allAdminPlayers.map(p=>`<option value="${p.id}">${esc(p.name)} ${p.currentCourt>0?'(Court '+p.currentCourt+')':'(Spare Pool)'}</option>`).join('')}
   </select>
   <button class="btn btn-success" onclick="doLinkWaiver(${regId})">Link Waiver</button>`;
   openModal('Link Waiver — '+regP.name, html);
