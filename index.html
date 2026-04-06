@@ -2049,10 +2049,13 @@ async function quickAddToCourt(court){
 // GYM VIEW
 // ══════════════════════════════════════════════
 function renderCourts(){
-  const assignments=S.current?S.current.assignments:autoAssign();
+  // When no session: show players on their ACTUAL DB courts (not auto-redistributed)
+  let assignments;
+  if(S.current){assignments=S.current.assignments;}
+  else{assignments={};for(let c=1;c<=NC;c++)assignments[c]=[];activePlayers().forEach(p=>{if(p.currentCourt>=1&&p.currentCourt<=NC)assignments[p.currentCourt].push(p.id);});}
   const cy=S.current?S.current.cycle:0;
   const sub=document.getElementById('courts-sub');
-  if(sub)sub.textContent=S.current?`Session ${S.current.number} · ${S.current.date} · Round ${cy}/${NCYC}`:S.sessions.length?`${S.sessions.length}/8 sessions done`:'No active session';
+  if(sub)sub.textContent=S.current?`Session ${S.current.number} · ${S.current.date} · Round ${cy}`:S.sessions.length?`${S.sessions.length}/8 sessions done`:'No active session';
   const cb=document.getElementById('cybar');
   if(cb)cb.innerHTML=Array.from({length:NCYC},(_,i)=>`<div class="cyseg ${i<cy-1?'done':i===cy-1&&S.current?'act':''}"></div>`).join('');
   // Admin badge on courts page
@@ -2164,7 +2167,7 @@ function renderCourts(){
 }
 
 function showCourtDetail(court){
-  const assignments=S.current?S.current.assignments:autoAssign();
+  let assignments;if(S.current){assignments=S.current.assignments;}else{assignments={};for(let c=1;c<=NC;c++)assignments[c]=[];activePlayers().forEach(p=>{if(p.currentCourt>=1&&p.currentCourt<=NC)assignments[p.currentCourt].push(p.id);});}
   const pids=assignments[court]||[];
   const players=pids.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
   const showMedals=!S.current||S.current.completed;
@@ -2184,7 +2187,7 @@ function showCourtDetail(court){
 }
 
 function shareCourtAssignments(){
-  const assignments=S.current?S.current.assignments:autoAssign();
+  let assignments;if(S.current){assignments=S.current.assignments;}else{assignments={};for(let c=1;c<=NC;c++)assignments[c]=[];activePlayers().forEach(p=>{if(p.currentCourt>=1&&p.currentCourt<=NC)assignments[p.currentCourt].push(p.id);});}
   let msg=`🏸 *DC Badminton Club*\n*Court Assignments — ${S.current?S.current.date+', 2026':'Tonight'}*\n\n`;
   for(let c=1;c<=NC;c++){
     const players=(assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
