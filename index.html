@@ -847,23 +847,24 @@ function checkRegistrationStatus(){
   }
   updateNavVisibility();
 }
-// One-tap player picker for returning players
-function showPlayerPicker(){
-  const approved=S.players.filter(p=>p.approved&&p.email&&p.email.length>3);
-  if(!approved.length){toast('No approved players yet','warn');return;}
-  const html=`<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select your name to sign in:</div>
-    <div style="display:flex;flex-direction:column;gap:6px;">
-    ${approved.map(p=>`<button class="btn btn-ghost" style="margin:0;text-align:left;justify-content:flex-start;" onclick="pickPlayer(${p.id})">
-      ${avatar(p.name,'sm')} <span style="margin-left:8px;font-weight:700;">${esc(p.name)}</span>
-    </button>`).join('')}
-    </div>`;
-  openModal('Who are you?',html);
+// Email sign-in for returning registered players
+function showSignIn(){
+  openModal('Sign In','<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Enter the email you used to register:</div><input class="inp" id="signin-email" type="email" placeholder="your@email.com" autocomplete="email"><button class="btn btn-primary" onclick="doSignIn()">Sign In</button>');
+  setTimeout(()=>document.getElementById('signin-email')?.focus(),100);
 }
-function pickPlayer(id){
-  const p=S.players.find(x=>x.id===id);if(!p)return;
-  localStorage.setItem('dcbc-email',p.email);
-  closeModal();checkRegistrationStatus();renderAll();
-  toast('Welcome back, '+p.name+'!','success');
+function doSignIn(){
+  const email=(document.getElementById('signin-email')?.value||'').trim().toLowerCase();
+  if(!email||!email.includes('@')){toast('Enter a valid email','warn');return;}
+  const me=S.players.find(p=>p.email.toLowerCase()===email);
+  if(me&&me.approved){
+    localStorage.setItem('dcbc-email',email);
+    closeModal();checkRegistrationStatus();renderAll();
+    toast('Welcome back, '+me.name+'!','success');
+  }else if(me&&!me.approved){
+    toast('Your registration is pending admin approval','warn');
+  }else{
+    toast('Email not found — please register first','warn');
+  }
 }
 
 function updateNavVisibility(){
@@ -1100,7 +1101,7 @@ function renderHome(){
         <button class="btn btn-ghost" style="margin:0;" onclick="nav('schedule')">📅 Schedule</button>`;
     }else{
       qab.innerHTML=`<button class="btn btn-primary" style="margin:0;grid-column:span 2;" onclick="nav('register')">📋 Register Now to Access All Features</button>
-        <button class="btn btn-ghost" style="margin:0;grid-column:span 2;" onclick="showPlayerPicker()">🔑 Already registered? Tap here</button>`;
+        <button class="btn btn-ghost" style="margin:0;grid-column:span 2;" onclick="showSignIn()">🔑 Already registered? Sign in</button>`;
     }
   }
   const cd=document.getElementById('countdown');
