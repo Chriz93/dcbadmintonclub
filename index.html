@@ -3758,16 +3758,17 @@ async function distributeBirds(){
     if(cnt<=0)continue;
     const pids=S.current.assignments[c]||[];
     if(pids.length===0)continue;
-    // Rank players on this court by total session wins (across all rounds)
+    // Rank by LAST round performance only (the players currently on this court)
+    const lastRound=S.current.cycle;
     const playerWins={};
     pids.forEach(id=>playerWins[id]=0);
-    Object.entries(S.current.scores).forEach(([key,sc])=>{
-      // Check if this score is for this court
-      if(!key.startsWith(`c${c}_`))return;
+    for(let g=1;g<=NG;g++){
+      const sc=S.current.scores[`c${c}_y${lastRound}_g${g}`];
+      if(!sc)continue;
       const sa=[sc.a1,sc.a2].filter(x=>x!=null),sb=[sc.b1,sc.b2].filter(x=>x!=null);
       if(sc.w==='A')sa.forEach(id=>{if(playerWins[id]!==undefined)playerWins[id]++;});
       else if(sc.w==='B')sb.forEach(id=>{if(playerWins[id]!==undefined)playerWins[id]++;});
-    });
+    }
     const ranked=[...pids].sort((a,b)=>(playerWins[b]||0)-(playerWins[a]||0));
     // Distribute within THIS court only:
     // 1 bird=top scorer, 2=top 2, 3=top 3, 4=all get 1
