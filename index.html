@@ -1281,7 +1281,22 @@ async function callInSpare(id){
   await loadAll();renderAll();
   toast(`${p.name} called in → Court ${targetCourt}`,'success');
 }
-async function setPlayerCourt(id,c){await sbU('players',id,{current_court:parseInt(c)});await loadAll();renderAll();}
+async function setPlayerCourt(id,c){
+  const court=parseInt(c);
+  // Update session assignments if session active
+  if(S.current){
+    // Remove from all courts first
+    for(let cc=1;cc<=NC;cc++){S.current.assignments[cc]=(S.current.assignments[cc]||[]).filter(pid=>pid!==id);}
+    // Add to new court (if not bench)
+    if(court>0&&court<=NC){
+      S.current.assignments[court]=(S.current.assignments[court]||[]);
+      S.current.assignments[court].push(id);
+    }
+    await setKV('current_session',S.current);
+  }
+  await sbU('players',id,{current_court:court,highest_court:court||0});
+  await loadAll();renderAll();
+}
 async function toggleMembership(id,type){
   const p=S.players.find(x=>x.id===id);if(!p)return;
   if(type===p.membershipType)return; // no change
