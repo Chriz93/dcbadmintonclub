@@ -7099,14 +7099,14 @@ if(window.location.hash==='#run-tests'){
       Array.isArray(sm.absent)?P('SS:absentArray'):F('SS:absentArray','bad');
       // Show summary modal
       try{showSessionSummary(sm);P('SS:modalOpens');}catch(e){F('SS:modalOpens',e.message);}
-      const modalBody=document.getElementById('modal-body')?.innerHTML||'';
-      modalBody.includes('Session')?P('SS:modalHasSession'):F('SS:modalHasSession','miss');
-      modalBody.includes('Court 1')?P('SS:modalHasC1'):F('SS:modalHasC1','miss');
-      modalBody.includes('Final Court')?P('SS:modalHasFinal'):F('SS:modalHasFinal','miss');
-      modalBody.includes('Movement')||modalBody.includes('Round')?P('SS:modalHasMvs'):F('SS:modalHasMvs','miss');
-      modalBody.includes('Messenger')||modalBody.includes('Copy')?P('SS:modalHasCopy'):F('SS:modalHasCopy','miss');
-      !modalBody.includes('NaN')?P('SS:noNaN'):F('SS:noNaN','found');
-      !modalBody.includes('undefined')?P('SS:noUndef'):F('SS:noUndef','found');
+      const smModal=document.getElementById('modal-body')?.innerHTML||'';
+      smModal.includes('Session')?P('SS:modalHasSession'):F('SS:modalHasSession','miss');
+      smModal.includes('Court 1')?P('SS:modalHasC1'):F('SS:modalHasC1','miss');
+      smModal.includes('Final Court')?P('SS:modalHasFinal'):F('SS:modalHasFinal','miss');
+      smModal.includes('Movement')||smModal.includes('Round')?P('SS:modalHasMvs'):F('SS:modalHasMvs','miss');
+      smModal.includes('Messenger')||smModal.includes('Copy')?P('SS:modalHasCopy'):F('SS:modalHasCopy','miss');
+      !smModal.includes('NaN')?P('SS:noNaN'):F('SS:noNaN','found');
+      !smModal.includes('undefined')?P('SS:noUndef'):F('SS:noUndef','found');
       closeModal();
       // buildSessionSummary with null
       const smNull=buildSessionSummary(null);
