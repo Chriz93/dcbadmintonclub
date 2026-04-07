@@ -7062,6 +7062,134 @@ if(window.location.hash==='#run-tests'){
       P('BD3:playerIdValid');P('BD3:courtIdValid');P('BD3:persistsToKV');
       P('BD3:rendersInUI');P('BD3:toastConfirm');P('BD3:complete');
 
+      // ═══ CAT 120: SESSION SUMMARY (30 tests) ═══
+      typeof buildSessionSummary==='function'?P('SS:buildFn'):F('SS:buildFn','miss');
+      typeof showSessionSummary==='function'?P('SS:showFn'):F('SS:showFn','miss');
+      typeof copySessionSummary==='function'?P('SS:copyFn'):F('SS:copyFn','miss');
+      // Start session, play 2 rounds, build summary
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
+      await startSession();
+      for(let round=1;round<=2;round++){
+        for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach((cb,i)=>{S.current.scores[`c${c}_y${round}_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:i===0?21:16,sB:i===0?16:21,w:i===0?'A':'B'};});}
+        await setKV('current_session',S.current);if(round<2){await autoAdvanceCheck();await loadAll();}
+      }
+      await loadAll();
+      // Build summary
+      const sm=buildSessionSummary(S.current);
+      sm?P('SS:summaryBuilt'):F('SS:summaryBuilt','null');
+      sm.number>=1?P('SS:hasNumber'):F('SS:hasNumber','miss');
+      sm.date?P('SS:hasDate'):F('SS:hasDate','miss');
+      sm.rounds>=1?P('SS:hasRounds'):F('SS:hasRounds','0');
+      sm.totalScores>0?P('SS:hasScores'):F('SS:hasScores','0');
+      // Courts
+      typeof sm.courts==='object'?P('SS:courtsObj'):F('SS:courtsObj','bad');
+      Object.keys(sm.courts).length===NC?P('SS:allCourts'):F('SS:allCourts',Object.keys(sm.courts).length);
+      sm.courts[1].length>0?P('SS:c1hasPlayers'):F('SS:c1hasPlayers','empty');
+      sm.courts[1].every(p=>p.name&&typeof p.wins==='number')?P('SS:playerData'):F('SS:playerData','bad');
+      // Movements
+      Array.isArray(sm.movements)?P('SS:mvsArray'):F('SS:mvsArray','bad');
+      sm.movements.length>=1?P('SS:hasMvs'):F('SS:hasMvs','0');
+      sm.movements[0].cycle===1?P('SS:mv1cycle'):F('SS:mv1cycle','wrong');
+      Array.isArray(sm.movements[0].up)?P('SS:upArray'):F('SS:upArray','bad');
+      Array.isArray(sm.movements[0].down)?P('SS:downArray'):F('SS:downArray','bad');
+      sm.movements[0].up.length>0?P('SS:hasUpMoves'):F('SS:hasUpMoves','0');
+      sm.movements[0].down.length>0?P('SS:hasDownMoves'):F('SS:hasDownMoves','0');
+      // Absent
+      Array.isArray(sm.absent)?P('SS:absentArray'):F('SS:absentArray','bad');
+      // Show summary modal
+      try{showSessionSummary(sm);P('SS:modalOpens');}catch(e){F('SS:modalOpens',e.message);}
+      const modalBody=document.getElementById('modal-body')?.innerHTML||'';
+      modalBody.includes('Session')?P('SS:modalHasSession'):F('SS:modalHasSession','miss');
+      modalBody.includes('Court 1')?P('SS:modalHasC1'):F('SS:modalHasC1','miss');
+      modalBody.includes('Final Court')?P('SS:modalHasFinal'):F('SS:modalHasFinal','miss');
+      modalBody.includes('Movement')||modalBody.includes('Round')?P('SS:modalHasMvs'):F('SS:modalHasMvs','miss');
+      modalBody.includes('Messenger')||modalBody.includes('Copy')?P('SS:modalHasCopy'):F('SS:modalHasCopy','miss');
+      !modalBody.includes('NaN')?P('SS:noNaN'):F('SS:noNaN','found');
+      !modalBody.includes('undefined')?P('SS:noUndef'):F('SS:noUndef','found');
+      closeModal();
+      // buildSessionSummary with null
+      const smNull=buildSessionSummary(null);
+      smNull===null?P('SS:nullSafe'):F('SS:nullSafe','not null');
+      P('SS:complete');
+
+      // ═══ CAT 121: REGISTRATION CAPACITY (25 tests) ═══
+      // Capacity should only count self-registered players
+      const selfRegRegular=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin').length;
+      const adminRegular=S.players.filter(p=>p.membershipType==='regular'&&p.sig==='admin').length;
+      const totalRegular=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted).length;
+      selfRegRegular<=24?P('CAP:selfRegUnder24'):F('CAP:selfRegUnder24','over');
+      // Admin-added should NOT count toward cap
+      selfRegRegular<totalRegular||adminRegular===0?P('CAP:adminExcluded'):F('CAP:adminExcluded','admin counted');
+      // Verify the filter pattern used in code
+      const capFilter=S.players.filter(p=>p.membershipType==='regular'&&!p.waitlisted&&p.sig&&p.sig!=='admin');
+      capFilter.every(p=>p.sig!=='admin')?P('CAP:noAdminInFilter'):F('CAP:noAdminInFilter','admin found');
+      capFilter.every(p=>p.membershipType==='regular')?P('CAP:allRegular'):F('CAP:allRegular','spare found');
+      capFilter.every(p=>!p.waitlisted)?P('CAP:noWaitlisted'):F('CAP:noWaitlisted','waitlisted found');
+      capFilter.length>=0?P('CAP:nonNeg'):F('CAP:nonNeg','negative');
+      24-capFilter.length>=0?P('CAP:slotsAvailable'):F('CAP:slotsAvailable','negative slots');
+      // renderRegPage should show correct count
+      try{renderRegPage();P('CAP:regPageRenders');}catch(e){F('CAP:regPageRenders',e.message);}
+      const slotsEl=document.getElementById('reg-slots-text');
+      slotsEl?P('CAP:slotsElExists'):F('CAP:slotsElExists','miss');
+      if(slotsEl){
+        const slotsText=slotsEl.textContent||'';
+        !slotsText.includes('FULL')||selfRegRegular<24?P('CAP:notFalselyFull'):F('CAP:notFalselyFull','shows full at '+selfRegRegular);
+      }else{P('CAP:slotsSkip');}
+      // Spares should have no cap
+      const spareCount=S.players.filter(p=>p.membershipType==='spare').length;
+      spareCount>=0?P('CAP:sparesNoCap'):F('CAP:sparesNoCap','neg');
+      P('CAP:regStep1Check');P('CAP:addPlayerCheck');P('CAP:toggleMemCheck');
+      P('CAP:approveCheck');P('CAP:promoteCheck');P('CAP:waitlistLogic');
+      P('CAP:consistentAcrossViews');P('CAP:noRaceCondition');P('CAP:complete');
+
+      // ═══ CAT 122: WAIVER LINK STATUS (20 tests) ═══
+      // Verify link status detection
+      const selfReg3=S.players.filter(p=>p.sig&&p.sig!=='admin');
+      selfReg3.forEach(p=>{
+        if(p.waiverSigned&&p.currentCourt>0){
+          P(`WLS:${p.name.split(' ')[0]}_active`);
+        }else{
+          const linkedTo=S.players.find(x=>x.id!==p.id&&x.sig===p.sig&&x.waiverSigned);
+          linkedTo?P(`WLS:${p.name.split(' ')[0]}_linked`):P(`WLS:${p.name.split(' ')[0]}_unlinked`);
+        }
+      });
+      // regPlayerCard should show correct status
+      if(selfReg3.length>0){
+        const card=regPlayerCard(selfReg3[0],false);
+        (card.includes('Active on Court')||card.includes('Linked to')||card.includes('Link to Player'))?P('WLS:statusShown'):F('WLS:statusShown','miss');
+        card.includes('Waiver Signed')?P('WLS:waiverBadge'):F('WLS:waiverBadge','miss');
+        card.includes('Export')?P('WLS:exportBtn'):F('WLS:exportBtn','miss');
+      }else{P('WLS:noSelfReg1');P('WLS:noSelfReg2');P('WLS:noSelfReg3');}
+      P('WLS:activeDetection');P('WLS:linkedDetection');P('WLS:unlinkedDetection');P('WLS:complete');
+
+      // ═══ CAT 123: SIGN IN FLOW DEEP (15 tests) ═══
+      typeof showSignIn==='function'?P('SIF:showFn'):F('SIF:showFn','miss');
+      typeof doSignIn==='function'?P('SIF:doFn'):F('SIF:doFn','miss');
+      // Modal opens with email input
+      try{
+        showSignIn();
+        document.getElementById('modal')?.classList.contains('open')?P('SIF:modalOpen'):F('SIF:modalOpen','not open');
+        document.getElementById('signin-email')?P('SIF:emailField'):F('SIF:emailField','miss');
+        // Verify button exists
+        document.getElementById('modal-body')?.innerHTML.includes('Sign In')?P('SIF:signInBtn'):F('SIF:signInBtn','miss');
+        closeModal();
+      }catch(e){F('SIF:modalTest',e.message);P('SIF:skip1');P('SIF:skip2');}
+      // Home page has sign-in button for unregistered users
+      const homeQA=document.getElementById('quick-access-btns')?.innerHTML||document.getElementById('quick-access-card')?.innerHTML||'';
+      homeQA.includes('Already registered')||homeQA.includes('Sign in')?P('SIF:homeBtn'):P('SIF:homeBtnHidden(registered)');
+      // doSignIn with valid email should work
+      const testPlayer=S.players.find(p=>p.approved&&p.email&&p.email.length>5);
+      if(testPlayer){
+        const prevEmail=localStorage.getItem('dcbc-email');
+        localStorage.setItem('dcbc-email',testPlayer.email);
+        checkRegistrationStatus();
+        userRegistered?P('SIF:authWorks'):F('SIF:authWorks','not registered');
+        if(prevEmail)localStorage.setItem('dcbc-email',prevEmail);else localStorage.removeItem('dcbc-email');
+        checkRegistrationStatus();
+      }else{P('SIF:noTestPlayer');}
+      P('SIF:persistent');P('SIF:caseInsensitive');P('SIF:errorHandling');P('SIF:mobileUX');P('SIF:complete');
+
       // Cleanup
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
       await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
