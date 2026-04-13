@@ -789,7 +789,7 @@ async function sbU(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,
 async function sbD(t,id){await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});}
 async function sbUps(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});return r.json();}
 async function getKV(k){try{const r=await sbG('app_state',`key=eq.${k}`);return(r&&r[0])?JSON.parse(r[0].value):null;}catch(e){return null;}}
-async function setKV(k,v){await sbUps('app_state',{key:k,value:JSON.stringify(v)});}
+async function setKV(k,v){try{await sbUps('app_state',{key:k,value:JSON.stringify(v)});}catch(e){console.error('setKV failed:',k,e);toast('Save failed — check connection','error');}}
 
 // ══════════════════════════════════════════════
 // STATE
@@ -1739,7 +1739,8 @@ async function applyRotation(){
       const p0=S.players.find(p=>p.id===scores[0].id);
       const p1=S.players.find(p=>p.id===scores[1].id);
       if(p0&&p1){
-        const winner=prompt(`Court ${c} TIE at the top!\n${p0.name} and ${p1.name} have the same score.\n\nWho won the toss? Enter 1 for ${p0.name} or 2 for ${p1.name}:`);
+        let winner=null;
+        while(winner!=='1'&&winner!=='2'){winner=prompt(`Court ${c} TIE at the top!\n${p0.name} and ${p1.name} have the same score.\n\nWho won the toss? Enter 1 for ${p0.name} or 2 for ${p1.name}:`);if(winner===null){winner='1';break;}}
         if(winner==='2')tossResults[scores[0].id+'_'+scores[1].id]=scores[1].id;
         else tossResults[scores[0].id+'_'+scores[1].id]=scores[0].id;
       }
@@ -1750,8 +1751,9 @@ async function applyRotation(){
       const pL=S.players.find(p=>p.id===scores[last].id);
       const pP=S.players.find(p=>p.id===scores[prev].id);
       if(pL&&pP&&!tossResults[scores[prev].id+'_'+scores[last].id]){
-        const winner=prompt(`Court ${c} TIE at the bottom!\n${pP.name} and ${pL.name} have the same score.\n\nWho WON the toss (stays)? Enter 1 for ${pP.name} or 2 for ${pL.name}:`);
-        if(winner==='2')tossResults[scores[prev].id+'_'+scores[last].id]=scores[last].id;
+        let winner2=null;
+        while(winner2!=='1'&&winner2!=='2'){winner2=prompt(`Court ${c} TIE at the bottom!\n${pP.name} and ${pL.name} have the same score.\n\nWho WON the toss (stays)? Enter 1 for ${pP.name} or 2 for ${pL.name}:`);if(winner2===null){winner2='1';break;}}
+        if(winner2==='2')tossResults[scores[prev].id+'_'+scores[last].id]=scores[last].id;
         else tossResults[scores[prev].id+'_'+scores[last].id]=scores[prev].id;
       }
     }
@@ -2419,7 +2421,8 @@ function shareCourtAssignments(){
 // SCORES
 // ══════════════════════════════════════════════
 function buildCombos(players){
-  // Returns combos array based on player count (2=singles best-of-3, 3=round-robin singles, 4=doubles)
+  if(!players||!Array.isArray(players))return[];
+  players=players.filter(Boolean); // Remove null/undefined
   const n=players.length;
   if(n===4){
     const[A,B,C,D]=players;
@@ -2942,9 +2945,10 @@ function computeEloRatings(){
   // Starting ELO based on initial court: C1=1500, C2=1400, ..., C6=1000
   activePlayers().forEach(p=>{elo[p.id]=1500-((p.currentCourt-1)*100);});
   // Process all completed sessions
-  const allSess=[...S.sessions];
+  const allSess=[...S.sessions].filter(Boolean);
   if(S.current)allSess.push(S.current);
   allSess.forEach(sess=>{
+    if(!sess)return;
     (sess.movements||[]).forEach(mv=>{
       const cycle=mv.cycle;
       // For each court in this round, compute ELO changes
@@ -3037,7 +3041,7 @@ function computePlayerStreakAndImprovement(){
   // Includes BOTH completed sessions AND current active session data
   const result={};
   // Combine completed sessions + current session (if active) for full picture
-  const allSessions=[...S.sessions];
+  const allSessions=[...S.sessions].filter(Boolean);
   if(S.current&&S.current.movements&&S.current.movements.length>0){
     allSessions.push(S.current); // include active session data
   }
