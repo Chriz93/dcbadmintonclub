@@ -4105,7 +4105,10 @@ function renderAttendanceTab(){
   // Build attendance by court
   let html=`<div class="card"><div class="card-title">📋 Session ${sessionNum} Attendance</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Mark players present or absent. Absent players are auto-removed from their court. Call in spares to fill open slots.</div>`;
-  // Count stats — only players currently on courts (not spare pool)
+  // Count stats — present/absent from attendance data, unmarked from court players
+  const absentCount=Object.values(att).filter(v=>v==='absent').length;
+  const presentCount=Object.values(att).filter(v=>v==='present').length;
+  // Unmarked = players on courts who haven't been marked yet
   const courtPlayerIds=new Set();
   for(let c=1;c<=NC;c++){
     let cpids;
@@ -4113,9 +4116,7 @@ function renderAttendanceTab(){
     else{cpids=activePlayers().filter(p=>p.currentCourt===c).map(p=>p.id);}
     cpids.forEach(id=>courtPlayerIds.add(id));
   }
-  const presentCount=[...courtPlayerIds].filter(id=>att[id]==='present').length;
-  const absentCount=[...courtPlayerIds].filter(id=>att[id]==='absent').length;
-  const unmarkedCount=courtPlayerIds.size-presentCount-absentCount;
+  const unmarkedCount=[...courtPlayerIds].filter(id=>!att[id]).length;
   html+=`<div style="display:flex;gap:8px;margin-bottom:12px;">
     <span class="tag tg-green">✅ ${presentCount} Present</span>
     <span class="tag tg-red">❌ ${absentCount} Absent</span>
