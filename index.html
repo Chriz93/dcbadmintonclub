@@ -604,6 +604,7 @@ textarea.inp{resize:vertical;min-height:80px;}
     <button class="ptab" onclick="showSec('standings','rank',this)">🎯 Rankings</button>
     <button class="ptab" onclick="showSec('standings','pstats',this)">📊 Stats</button>
     <button class="ptab" onclick="showSec('standings','heat',this)">🔥 Heatmap</button>
+    <button class="ptab" onclick="showSec('standings','sessstand',this)">📋 Sessions</button>
     <button class="ptab" onclick="showSec('standings','hist',this)">📅 History</button>
     <button class="ptab" onclick="showSec('standings','vote',this)">📋 RSVP</button>
     <button class="ptab" onclick="showSec('standings','qa',this)">❓ Q&amp;A</button>
@@ -612,6 +613,7 @@ textarea.inp{resize:vertical;min-height:80px;}
   <div id="sec-rank" class="section"></div>
   <div id="sec-pstats" class="section"></div>
   <div id="sec-heat" class="section"></div>
+  <div id="sec-sessstand" class="section"></div>
   <div id="sec-hist" class="section"></div>
   <div id="sec-vote" class="section"></div>
   <div id="sec-qa" class="section"></div>
@@ -3136,6 +3138,55 @@ function renderHeatmap(){
   </div>`;
 }
 let _expandedHist={};// Track which sessions are expanded
+function renderSessionStandings(){
+  const el=document.getElementById('sec-sessstand');if(!el)return;
+  if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">📋</div><div class="em">No completed sessions yet</div></div>';return;}
+  const pm=id=>{const p=S.players.find(x=>x.id===id);return p?p.name:'?';};
+  let html='<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Final court standings from each completed session. This is the permanent record — unaffected by court changes for next week.</div>';
+  [...S.sessions].reverse().forEach(s=>{
+    // Calculate per-player wins for this session from scores
+    const playerWins={},playerLosses={},playerGP={};
+    Object.values(s.scores||{}).forEach(sc=>{
+      const sa=[sc.a1,sc.a2].filter(x=>x!=null);
+      const sb=[sc.b1,sc.b2].filter(x=>x!=null);
+      [...sa,...sb].forEach(id=>{playerWins[id]=(playerWins[id]||0);playerLosses[id]=(playerLosses[id]||0);playerGP[id]=(playerGP[id]||0)+1;});
+      if(sc.w==='A')sa.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});
+      else if(sc.w==='B')sb.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});
+      if(sc.w==='A')sb.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});
+      else if(sc.w==='B')sa.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});
+    });
+    const rndCount=new Set(Object.keys(s.scores||{}).map(k=>{const m=k.match(/_y(\d+)_/);return m?parseInt(m[1]):0;})).size;
+    html+=`<div class="card">
+      <div class="card-title">Session ${s.number} — ${s.date}, 2026 · ${rndCount} Rounds</div>`;
+    for(let c=1;c<=NC;c++){
+      const pids=s.assignments[c]||[];
+      if(!pids.length)continue;
+      const cls=c===1?'var(--gold)':c===2?'var(--silver)':c===3?'var(--bronze)':'var(--teal2)';
+      // Sort players on this court by wins
+      const sorted=[...pids].sort((a,b)=>(playerWins[b]||0)-(playerWins[a]||0));
+      html+=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:800;color:${cls};margin-bottom:4px;">Court ${c}</div>`;
+      sorted.forEach((id,i)=>{
+        const name=pm(id);
+        const w=playerWins[id]||0;
+        const l=playerLosses[id]||0;
+        const gp=playerGP[id]||0;
+        const wr=gp>0?Math.round(w/gp*100):0;
+        // Show movement from this session
+        const lastMv=s.movements?.length>0?s.movements[s.movements.length-1]:null;
+        const mvDir=lastMv?.mv?.[id];
+        const arrow=mvDir==='up'?'<span style="color:var(--green2);"> ↑</span>':mvDir==='down'?'<span style="color:var(--red2);"> ↓</span>':'';
+        html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;">
+          <span>${i+1}. ${esc(name.split(' ')[0])}${arrow}</span>
+          <span style="color:var(--teal2);font-weight:700;">${w}W ${l}L · ${wr}%</span>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  });
+  el.innerHTML=html;
+}
 function renderHistory(){
   const el=document.getElementById('sec-hist');if(!el)return;
   if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">📅</div><div class="em">No completed sessions yet</div></div>';return;}
@@ -3858,7 +3909,7 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 function renderAll(){
   checkRegistrationStatus();
   renderHome();renderRegPage();renderCourts();renderRoundTracker();renderSchedule();
-  renderLeaderboard();renderRankings();renderPlayerStats();renderHeatmap();renderHistory();renderRSVP();renderQA();
+  renderLeaderboard();renderRankings();renderPlayerStats();renderHeatmap();renderSessionStandings();renderHistory();renderRSVP();renderQA();
   renderPOS('pos-standings');
   if(adminUnlocked){renderAdminPlayers();renderRegPlayers();renderSessionAdmin();renderAssignUI();renderPayments();renderAnnouncementsAdmin();}
   // Skip score re-render during background sync to preserve unsaved input values
