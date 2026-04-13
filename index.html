@@ -1659,9 +1659,9 @@ async function autoAdvanceCheck(){
   _autoAdvancing=true;
   toast('All courts done! Advancing to Round '+(cy+1)+'...','success');
   try{
-    // Snapshot before rotation for undo
+    // Snapshot before rotation for undo (save async, don't block)
     _roundSnapshots.push({cycle:S.current.cycle,assignments:JSON.parse(JSON.stringify(S.current.assignments)),scores:JSON.parse(JSON.stringify(S.current.scores)),movements:JSON.parse(JSON.stringify(S.current.movements)),playerStats:activePlayers().map(p=>({id:p.id,w:p.seasonWins,l:p.seasonLosses,gp:p.gamesPlayed}))});
-    await setKV('round_snapshots',_roundSnapshots);
+    setKV('round_snapshots',_roundSnapshots).catch(()=>{});
     await applyRotation();S.current.cycle++;await setKV('current_session',S.current);await loadAll();renderAll();}
   catch(e){toast('Advance error','error');}
   finally{_autoAdvancing=false;}
@@ -1710,7 +1710,7 @@ async function nextCycle(){
   if(missing.length){toast(`Cannot advance — ${missing.length} scores missing: ${missing.slice(0,6).join(', ')}${missing.length>6?'...':''}`,'error');return;}
   // Snapshot before rotation for undo
   _roundSnapshots.push({cycle:S.current.cycle,assignments:JSON.parse(JSON.stringify(S.current.assignments)),scores:JSON.parse(JSON.stringify(S.current.scores)),movements:JSON.parse(JSON.stringify(S.current.movements)),playerStats:activePlayers().map(p=>({id:p.id,w:p.seasonWins,l:p.seasonLosses,gp:p.gamesPlayed}))});
-  await setKV('round_snapshots',_roundSnapshots);
+  setKV('round_snapshots',_roundSnapshots).catch(()=>{});
   await applyRotation();S.current.cycle++;
   await setKV('current_session',S.current);await loadAll();renderAll();toast('Round '+S.current.cycle+'!','success');
 }
