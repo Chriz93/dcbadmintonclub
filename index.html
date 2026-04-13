@@ -1427,16 +1427,21 @@ function renderRegPlayers(){
   const paidCount=S.players.filter(p=>p.paid).length;
   const unpaidCount=S.players.filter(p=>!p.paid&&(p.currentCourt>0||p.sig!=='admin')).length;
   const notRegistered=adminAdded.filter(p=>!p.waiverSigned);
+  const regRegular=selfReg.filter(p=>p.membershipType!=='spare');
+  const regSpare=selfReg.filter(p=>p.membershipType==='spare');
+  const totalPlayers=S.players.length;
   let html=`<div class="card"><div class="card-title">📊 Overview</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-bottom:10px;">
-      <div><div style="font-size:18px;font-weight:800;color:var(--teal2);">${selfReg.length}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Registered</div></div>
-      <div><div style="font-size:18px;font-weight:800;color:var(--green2);">${waiverSigned}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Waiver Signed</div></div>
-      <div><div style="font-size:18px;font-weight:800;color:var(--yellow2);">${paidCount}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Paid</div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:10px;">
+      <div><div style="font-size:18px;font-weight:800;color:var(--teal2);">${totalPlayers}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Total Players</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--teal2);">${selfReg.length}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Registered</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--teal);">${regRegular.length}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Reg. Regular</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--yellow2);">${regSpare.length}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Reg. Spare</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
-      <div><div style="font-size:18px;font-weight:800;color:var(--red2);">${notRegistered.length}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Not Registered</div></div>
-      <div><div style="font-size:18px;font-weight:800;color:var(--red2);">${waiverUnsigned}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">No Waiver</div></div>
-      <div><div style="font-size:18px;font-weight:800;color:var(--red2);">${unpaidCount}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Unpaid</div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+      <div><div style="font-size:18px;font-weight:800;color:var(--green2);">${waiverSigned}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Waiver ✓</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--green2);">${paidCount}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Paid</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--red2);">${notRegistered.length}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Not Reg.</div></div>
+      <div><div style="font-size:18px;font-weight:800;color:var(--red2);">${unpaidCount}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;">Unpaid</div></div>
     </div></div>`;
   // Not registered — admin-added without waiver
   if(notRegistered.length){
