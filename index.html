@@ -4453,10 +4453,9 @@ if(window.location.hash==='#run-tests'){
       }catch(e){for(let i=0;i<8;i++)F('RS:crash',e.message);}
 
       // ═══ CAT 6: SESSION LIFECYCLE (12) ═══
-      // Cancel any existing session
-      if(S.current){await setKV('current_session',null);await loadAll();}
-      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0})));
-      await loadAll();
+      // Clean slate
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);_roundSnapshots=[];_autoAdvancing=false;await loadAll();
       ap().every(p=>p.seasonWins===0)?P('Sess:statsReset'):F('Sess:statsReset','not 0');
       await startSession();
       S.current?P('Sess:started'):F('Sess:started','null');
