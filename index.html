@@ -1474,12 +1474,19 @@ function renderRegPlayers(){
     html+=pending.map(p=>regPlayerCard(p,true)).join('');
     html+='</div>';
   }
-  if(approved.length){
-    html+=`<div class="card"><div class="card-title">✅ Approved (${approved.length})</div>`;
-    html+=approved.map(p=>regPlayerCard(p,false)).join('');
+  const approvedRegular=approved.filter(p=>p.membershipType!=='spare');
+  const approvedSpare=approved.filter(p=>p.membershipType==='spare');
+  if(approvedRegular.length){
+    html+=`<div class="card"><div class="card-title">✅ Regular Members (${approvedRegular.length})</div>`;
+    html+=approvedRegular.map(p=>regPlayerCard(p,false)).join('');
     html+='</div>';
   }
-  if(!pending.length&&!approved.length&&!waitlisted.length)html='<div class="empty-state"><div class="ei">📋</div><div class="em">No registered players yet — players register through the Register tab</div></div>';
+  if(approvedSpare.length){
+    html+=`<div class="card" style="border-color:var(--yellow);"><div class="card-title" style="color:var(--yellow2);">🔄 Spare Players (${approvedSpare.length})</div>`;
+    html+=approvedSpare.map(p=>regPlayerCard(p,false)).join('');
+    html+='</div>';
+  }
+  if(!pending.length&&!approved.length&&!waitlisted.length&&!notRegistered.length)html+='<div class="empty-state"><div class="ei">📋</div><div class="em">No registered players yet — players register through the Register tab</div></div>';
   el.innerHTML=html;
   // Update pending badge on the Registered tab
   const badge=document.getElementById('reg-pending-badge');
