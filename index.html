@@ -503,7 +503,7 @@ textarea.inp{resize:vertical;min-height:80px;}
           <span style="font-weight:700;">I have read and agree to <strong>all sections above</strong> including: liability waiver & release, assumption of risk, OCDSB facility rules, non-refundable payment policy, media consent, privacy policy, and e-transfer responsibility. If registering a minor, I accept full responsibility as parent/guardian.</span>
         </div>
         <div class="chk-row" id="w5-row" style="display:none;"><input type="checkbox" id="w5"><span>I acknowledge the e-transfer payment of <strong>$150</strong> to <strong>christygeorge993@gmail.com</strong> is required to complete my registration.</span></div>
-        <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$24.50 per session</strong> via e-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</span></div>
+        <div class="chk-row" id="w6-row" style="display:none;"><input type="checkbox" id="w6"><span>I understand spare players are charged <strong>$20 per session</strong> via e-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</span></div>
         <label class="lbl" style="margin-top:8px;">Digital Signature (type full name) *</label>
         <input class="inp" id="r-sig" placeholder="Your full name as signature">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">⚠️ By typing your name you confirm this is a legally binding digital signature</div>
@@ -553,7 +553,7 @@ textarea.inp{resize:vertical;min-height:80px;}
         <div style="font-size:20px;font-weight:800;margin-bottom:8px;">Registration Submitted!</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:20px;" id="reg-success-msg">Your registration is pending admin approval.</div>
         <div class="alert alert-warn" id="reg-payment-note">⚠️ E-transfer $150 to:<br><strong>christygeorge993@gmail.com</strong><br><small>Use your name as the message</small></div>
-        <div class="alert alert-info" id="reg-spare-payment-note" style="display:none;">💡 As a spare, you pay <strong>$24.50 per session</strong> when called in.<br>E-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</div>
+        <div class="alert alert-info" id="reg-spare-payment-note" style="display:none;">💡 As a spare, you pay <strong>$20 per session</strong> when called in.<br>E-transfer to <strong>christygeorge993@gmail.com</strong> before or on the session date.</div>
         <div class="alert alert-info">📍 Maplewood Secondary School<br>700 Cope Drive, Stittsville · Gym 127C & 127D</div>
         <div class="alert alert-success">✅ First session: <strong>Tuesday April 7, 2026 at 8:15 PM</strong></div>
       </div>
@@ -674,7 +674,7 @@ textarea.inp{resize:vertical;min-height:80px;}
         <label class="lbl">Membership Type</label>
         <select class="inp" id="np-membership">
           <option value="regular">🏸 Regular ($150/season)</option>
-          <option value="spare">🔄 Spare ($24.50/session)</option>
+          <option value="spare">🔄 Spare ($20/session)</option>
         </select>
         <label class="lbl">Starting Court</label>
         <select class="inp" id="np-court">
@@ -1537,7 +1537,7 @@ function renderPayments(){
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;">${esc(p.name)}${isSpare?'<span class="spare-badge" style="margin-left:6px;">SPARE</span>':''}</div>
         <div style="font-size:11px;color:${p.paid?'var(--green2)':'var(--yellow2)'};">
-          ${p.paid?(isSpare?'✅ $24.50 session fee paid':'✅ Paid $150'):(isSpare?'⏳ $24.50 session fee pending':'⏳ $150 e-transfer pending')}
+          ${p.paid?(isSpare?'✅ $20 session fee paid':'✅ Paid $150'):(isSpare?'⏳ $20 session fee pending':'⏳ $150 e-transfer pending')}
         </div>
       </div>
       <button class="btn ${p.paid?'btn-ghost':'btn-success'} btn-sm" onclick="togglePaid(${p.id})">${p.paid?'Undo':'Mark Paid'}</button>
@@ -1642,7 +1642,7 @@ async function nextCycle(){
     const numGames=courtPlayers===3?3:NG; // 3-player RR has 3 games too
     for(let g=1;g<=numGames;g++)if(!S.current.scores[`c${c}_y${S.current.cycle}_g${g}`])missing.push(`C${c}G${g}`);
   }
-  if(missing.length&&!confirm(`Missing ${missing.length} scores. Proceed?`))return;
+  if(missing.length){toast(`Cannot advance — ${missing.length} scores missing: ${missing.slice(0,6).join(', ')}${missing.length>6?'...':''}`,'error');return;}
   await applyRotation();S.current.cycle++;
   await setKV('current_session',S.current);await loadAll();renderAll();toast('Round '+S.current.cycle+'!','success');
 }
@@ -3308,7 +3308,7 @@ function renderRegPage(){
           <div style="font-size:12px;margin-top:4px;">Waiver: <span style="color:var(--green2);">✓ Signed</span></div>
           ${me.approved&&me.currentCourt>0?`<div style="font-size:12px;margin-top:4px;">Court: <strong>Court ${me.currentCourt}</strong></div>`:(me.approved?'<div style="font-size:12px;margin-top:4px;color:var(--muted);">Court: <em>Pending admin assignment</em></div>':'')}
           ${!me.paid&&!isSpare?`<div class="alert alert-warn" style="margin-top:10px;">E-transfer $150 to <strong>christygeorge993@gmail.com</strong></div>`:''}
-          ${isSpare&&!me.paid?`<div class="alert alert-info" style="margin-top:10px;">💡 As a spare, you pay $24.50 per session when called in. E-transfer to christygeorge993@gmail.com before or on the session date.</div>`:''}
+          ${isSpare&&!me.paid?`<div class="alert alert-info" style="margin-top:10px;">💡 As a spare, you pay $20 per session when called in. E-transfer to christygeorge993@gmail.com before or on the session date.</div>`:''}
         </div>
         <button class="btn btn-ghost" onclick="localStorage.removeItem('dcbc-email');regData={};goRS(1);renderRegPage()">Register different player</button>`;
       return;
@@ -3515,7 +3515,7 @@ Medical Conditions: ${p.medical||'None disclosed'}
 
 REGISTRATION DETAILS
 Date Registered: ${p.registeredAt?new Date(p.registeredAt).toLocaleString():'Unknown'}
-Membership Type: ${p.membershipType==='spare'?'Spare ($24.50/session)':'Regular ($150/season)'}
+Membership Type: ${p.membershipType==='spare'?'Spare ($20/session)':'Regular ($150/season)'}
 Approved: ${p.approved?'YES':'PENDING'}
 Payment Status: ${p.paid?'PAID':'UNPAID'}
 
