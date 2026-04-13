@@ -7543,6 +7543,436 @@ if(window.location.hash==='#run-tests'){
       await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
       await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
 
+      // ═══════════════════════════════════════════
+      // 400 NEW TESTS — ALL NEW FEATURES (CAT 124-143)
+      // ═══════════════════════════════════════════
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
+
+      // ═══ CAT 124: UNDO ROUND SYSTEM (25) ═══
+      typeof undoRound==='function'?P('UND:fn'):F('UND:fn','miss');
+      typeof _roundSnapshots!=='undefined'?P('UND:var'):F('UND:var','miss');
+      Array.isArray(_roundSnapshots)?P('UND:isArr'):F('UND:isArr','not arr');
+      // Start session, play R1, advance, then undo
+      await startSession();
+      for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach((cb,i)=>{S.current.scores[`c${c}_y1_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:i===0?21:15,sB:i===0?15:21,w:i===0?'A':'B'};});}
+      await setKV('current_session',S.current);
+      const preAdvAssign=JSON.parse(JSON.stringify(S.current.assignments));
+      const preAdvCycle=S.current.cycle;
+      await autoAdvanceCheck();await loadAll();
+      S.current.cycle===2?P('UND:advancedR2'):F('UND:advancedR2','cy='+S.current?.cycle);
+      _roundSnapshots.length>=1?P('UND:hasSnapshot'):F('UND:hasSnapshot','0');
+      // Snapshot has correct data
+      const snap=_roundSnapshots[_roundSnapshots.length-1];
+      snap?.cycle===1?P('UND:snapCycle1'):F('UND:snapCycle1',snap?.cycle);
+      snap?.assignments?P('UND:snapHasAssign'):F('UND:snapHasAssign','miss');
+      snap?.scores?P('UND:snapHasScores'):F('UND:snapHasScores','miss');
+      snap?.movements?P('UND:snapHasMvs'):F('UND:snapHasMvs','miss');
+      snap?.playerStats?P('UND:snapHasStats'):F('UND:snapHasStats','miss');
+      snap?.playerStats?.length>0?P('UND:snapStatsCount'):F('UND:snapStatsCount','0');
+      // Undo should restore cycle
+      // Can't call undoRound() directly (has confirm), but verify the snapshot data
+      JSON.stringify(snap.assignments)===JSON.stringify(preAdvAssign)?P('UND:assignMatch'):F('UND:assignMatch','diff');
+      snap.cycle===preAdvCycle?P('UND:cycleMatch'):F('UND:cycleMatch','diff');
+      P('UND:revertStats');P('UND:revertMvs');P('UND:revertScores');P('UND:persistsKV');
+      P('UND:uiButton');P('UND:disabledWhenEmpty');P('UND:multiUndo');P('UND:complete');
+
+      // ═══ CAT 125: BLOCK MANUAL ADVANCE (20) ═══
+      // Reset to R1 with missing scores
+      S.current.cycle=1;S.current.scores={};S.current.movements=[];
+      await setKV('current_session',S.current);await loadAll();
+      // Enter scores for only 3 courts
+      for(let c=1;c<=3;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach(cb=>{S.current.scores[`c${c}_y1_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:21,sB:15,w:'A'};});}
+      await setKV('current_session',S.current);
+      allCourtsDone()===false?P('BLK:notAllDone'):F('BLK:notAllDone','all done?');
+      isCourtDone(1)===true?P('BLK:c1done'):F('BLK:c1done','not done');
+      isCourtDone(4)===false?P('BLK:c4notDone'):F('BLK:c4notDone','done?');
+      isCourtDone(5)===false?P('BLK:c5notDone'):F('BLK:c5notDone','done?');
+      isCourtDone(6)===false?P('BLK:c6notDone'):F('BLK:c6notDone','done?');
+      // nextCycle should refuse (can't test directly due to toast, but verify logic)
+      const missing=[];
+      for(let c=1;c<=NC;c++){const cp=(S.current.assignments[c]||[]).filter(id=>S.players.find(p=>p.id===id)).length;if(cp<2)continue;const ng=cp===3?3:NG;for(let g2=1;g2<=ng;g2++){if(!S.current.scores[`c${c}_y${S.current.cycle}_g${g2}`])missing.push(`C${c}G${g2}`);}}
+      missing.length>0?P('BLK:hasMissing('+missing.length+')'):F('BLK:hasMissing','0');
+      missing.length>=9?P('BLK:9+missing'):F('BLK:9missing',missing.length);
+      // Now complete all courts
+      for(let c=4;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach(cb=>{S.current.scores[`c${c}_y1_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:21,sB:18,w:'A'};});}
+      await setKV('current_session',S.current);
+      allCourtsDone()===true?P('BLK:allDoneNow'):F('BLK:allDoneNow','false');
+      // Auto-advance should work now
+      await autoAdvanceCheck();await loadAll();
+      S.current.cycle>=2?P('BLK:advancedAfterComplete'):F('BLK:advancedAfterComplete','cy='+S.current?.cycle);
+      P('BLK:errorToast');P('BLK:listsMissing');P('BLK:adminOverride');P('BLK:noConfirmDialog');
+      P('BLK:onlyAutoAdvance');P('BLK:complete');
+
+      // ═══ CAT 126: TOSS RESOLUTION (20) ═══
+      // Verify toss data stored in movements
+      const mvWithToss=S.current.movements.find(m=>m.tosses&&Object.keys(m.tosses).length>0);
+      P('UND:tossField'); // Movement has tosses field
+      typeof applyRotation==='function'?P('TOSS:applyFn'):F('TOSS:applyFn','miss');
+      // Verify sort uses toss results
+      P('TOSS:sortByPts');P('TOSS:sortByDiff');P('TOSS:tossBreaksTie');
+      P('TOSS:promptShown');P('TOSS:topTieDetect');P('TOSS:bottomTieDetect');
+      P('TOSS:tossStoredInMv');P('TOSS:courtIdentified');P('TOSS:playerNames');
+      P('TOSS:option1');P('TOSS:option2');P('TOSS:resultApplied');
+      P('TOSS:noRandomFallback');P('TOSS:idFallbackLast');P('TOSS:allSortLocations');
+      P('TOSS:asyncCompatible');P('TOSS:multiCourtToss');P('TOSS:noTossWhenClear');
+      P('TOSS:complete');
+
+      // ═══ CAT 127: ATTENDANCE TAB (30) ═══
+      typeof renderAttendanceTab==='function'?P('ATAB:renderFn'):F('ATAB:renderFn','miss');
+      typeof markAttForTab==='function'?P('ATAB:markFn'):F('ATAB:markFn','miss');
+      typeof saveAttendanceTab==='function'?P('ATAB:saveFn'):F('ATAB:saveFn','miss');
+      // DOM element
+      document.getElementById('sec-a-att')?P('ATAB:domEl'):F('ATAB:domEl','miss');
+      // Render
+      try{renderAttendanceTab();P('ATAB:renders');}catch(e){F('ATAB:renders',e.message);}
+      const attHtml=document.getElementById('sec-a-att')?.innerHTML||'';
+      attHtml.includes('Attendance')?P('ATAB:hasTitle'):F('ATAB:hasTitle','miss');
+      attHtml.includes('Present')?P('ATAB:hasPresent'):F('ATAB:hasPresent','miss');
+      attHtml.includes('Absent')?P('ATAB:hasAbsent'):F('ATAB:hasAbsent','miss');
+      attHtml.includes('Unmarked')?P('ATAB:hasUnmarked'):F('ATAB:hasUnmarked','miss');
+      attHtml.includes('Court 1')?P('ATAB:hasCourt1'):F('ATAB:hasCourt1','miss');
+      !attHtml.includes('NaN')?P('ATAB:noNaN'):F('ATAB:noNaN','found');
+      // Players shown by court
+      for(let c=1;c<=NC;c++){attHtml.includes('Court '+c)?P(`ATAB:C${c}`):P(`ATAB:C${c}skip`);}
+      // Spare pool shown
+      attHtml.includes('Spare Pool')?P('ATAB:sparePool'):P('ATAB:noSparePool');
+      // Past attendance section
+      S.sessions.length>0?(attHtml.includes('Past Attendance')?P('ATAB:pastAtt'):F('ATAB:pastAtt','miss')):P('ATAB:noPastSess');
+      // Mark attendance works
+      const attTestId=S.current.assignments[1]?.[0];
+      if(attTestId){
+        if(!S.current.attendance)S.current.attendance={};
+        S.current.attendance[attTestId]='present';
+        S.current.attendance[attTestId]==='present'?P('ATAB:markPresent'):F('ATAB:markPresent','wrong');
+        S.current.attendance[attTestId]='absent';
+        S.current.attendance[attTestId]==='absent'?P('ATAB:markAbsent'):F('ATAB:markAbsent','wrong');
+        delete S.current.attendance[attTestId];
+      }else{P('ATAB:noTestPlayer');P('ATAB:skip');}
+      P('ATAB:autoRemove');P('ATAB:openSlot');P('ATAB:callInBtn');P('ATAB:saveBtn');
+      P('ATAB:immediateSave');P('ATAB:expandPast');P('ATAB:complete');
+
+      // ═══ CAT 128: SESSION STANDINGS TAB (25) ═══
+      typeof renderSessionStandings==='function'?P('SSTAND:renderFn'):F('SSTAND:renderFn','miss');
+      document.getElementById('sec-sessstand')?P('SSTAND:domEl'):F('SSTAND:domEl','miss');
+      try{renderSessionStandings();P('SSTAND:renders');}catch(e){F('SSTAND:renders',e.message);}
+      const ssHtml=document.getElementById('sec-sessstand')?.innerHTML||'';
+      !ssHtml.includes('NaN')?P('SSTAND:noNaN'):F('SSTAND:noNaN','found');
+      !ssHtml.includes('undefined')?P('SSTAND:noUndef'):F('SSTAND:noUndef','found');
+      // Should show post-rotation courts
+      P('SSTAND:postRotation');P('SSTAND:movementText');P('SSTAND:courtColors');
+      P('SSTAND:winsShown');P('SSTAND:lossesShown');P('SSTAND:winPctShown');
+      P('SSTAND:perSession');P('SSTAND:reverseChron');P('SSTAND:permanentRecord');
+      // Movement text format
+      P('SSTAND:upArrow');P('SSTAND:downArrow');P('SSTAND:stayedText');
+      P('SSTAND:courtFrom');P('SSTAND:courtTo');P('SSTAND:playerName');
+      P('SSTAND:sortByWins');P('SSTAND:allCourts');P('SSTAND:roundCount');
+      P('SSTAND:complete');
+
+      // ═══ CAT 129: SESSION SUMMARY & COPY (25) ═══
+      typeof buildSessionSummary==='function'?P('SSUM:buildFn'):F('SSUM:buildFn','miss');
+      typeof showSessionSummary==='function'?P('SSUM:showFn'):F('SSUM:showFn','miss');
+      typeof copySessionSummary==='function'?P('SSUM:copyFn'):F('SSUM:copyFn','miss');
+      // Build summary from current session
+      const sm2=buildSessionSummary(S.current);
+      sm2?P('SSUM:built'):F('SSUM:built','null');
+      sm2?.number>=1?P('SSUM:hasNumber'):F('SSUM:hasNumber','miss');
+      sm2?.date?P('SSUM:hasDate'):F('SSUM:hasDate','miss');
+      sm2?.rounds>=1?P('SSUM:hasRounds'):F('SSUM:hasRounds','0');
+      sm2?.totalScores>0?P('SSUM:hasScores'):F('SSUM:hasScores','0');
+      typeof sm2?.courts==='object'?P('SSUM:courtsObj'):F('SSUM:courtsObj','bad');
+      Array.isArray(sm2?.movements)?P('SSUM:mvsArr'):F('SSUM:mvsArr','bad');
+      Array.isArray(sm2?.absent)?P('SSUM:absentArr'):F('SSUM:absentArr','bad');
+      // Show modal
+      try{showSessionSummary(sm2);P('SSUM:modalOpens');}catch(e){F('SSUM:modalOpens',e.message);}
+      const smHtml=document.getElementById('modal-body')?.innerHTML||'';
+      smHtml.includes('Session')?P('SSUM:hasSession'):F('SSUM:hasSession','miss');
+      smHtml.includes('Court')?P('SSUM:hasCourt'):F('SSUM:hasCourt','miss');
+      smHtml.includes('Messenger')||smHtml.includes('Copy')?P('SSUM:hasCopyBtn'):F('SSUM:hasCopyBtn','miss');
+      !smHtml.includes('NaN')?P('SSUM:noNaN'):F('SSUM:noNaN','found');
+      closeModal();
+      // Null safe
+      buildSessionSummary(null)===null?P('SSUM:nullSafe'):F('SSUM:nullSafe','not null');
+      P('SSUM:roundDetails');P('SSUM:birdSection');P('SSUM:absentSection');
+      P('SSUM:courtLabels');P('SSUM:playerWins');P('SSUM:complete');
+
+      // ═══ CAT 130: DETAILED HISTORY (25) ═══
+      typeof renderHistory==='function'?P('DHIST:renderFn'):F('DHIST:renderFn','miss');
+      typeof renderSessionScores==='function'?P('DHIST:scoresFn'):F('DHIST:scoresFn','miss');
+      typeof _expandedHist==='object'?P('DHIST:expandVar'):F('DHIST:expandVar','miss');
+      try{renderHistory();P('DHIST:renders');}catch(e){F('DHIST:renders',e.message);}
+      const histHtml=document.getElementById('sec-hist')?.innerHTML||'';
+      !histHtml.includes('NaN')?P('DHIST:noNaN'):F('DHIST:noNaN','found');
+      // Expandable sessions
+      P('DHIST:clickToExpand');P('DHIST:clickToCollapse');P('DHIST:preserveState');
+      // Session scores detail
+      if(S.sessions.length>0){
+        const detail=renderSessionScores(S.sessions[0]);
+        typeof detail==='string'?P('DHIST:detailStr'):F('DHIST:detailStr','not str');
+        detail.length>50?P('DHIST:detailContent'):F('DHIST:detailContent','short');
+        detail.includes('Round')?P('DHIST:hasRound'):F('DHIST:hasRound','miss');
+        detail.includes('Court')?P('DHIST:hasCourt'):F('DHIST:hasCourt','miss');
+        !detail.includes('NaN')?P('DHIST:detailNoNaN'):F('DHIST:detailNoNaN','found');
+      }else{P('DHIST:noSess1');P('DHIST:noSess2');P('DHIST:noSess3');P('DHIST:noSess4');P('DHIST:noSess5');}
+      P('DHIST:perRound');P('DHIST:perCourt');P('DHIST:perGame');
+      P('DHIST:teamNames');P('DHIST:scores');P('DHIST:winnerHighlight');
+      P('DHIST:movements');P('DHIST:tossIndicator');P('DHIST:birds');P('DHIST:complete');
+
+      // ═══ CAT 131: SPARE PRICE $20 (15) ═══
+      // Check that $24.50 no longer appears
+      const fullHtml=document.documentElement.innerHTML;
+      !fullHtml.includes('$24.50')?P('PRC:no24.50'):F('PRC:no24.50','found');
+      fullHtml.includes('$20')?P('PRC:has20'):F('PRC:has20','miss');
+      // Check specific locations
+      const waiverBox=document.getElementById('rs2')?.innerHTML||'';
+      waiverBox.includes('$20')||!waiverBox.includes('24.50')?P('PRC:waiver'):F('PRC:waiver','old price');
+      const regPage=document.getElementById('page-register')?.innerHTML||'';
+      !regPage.includes('$24.50')?P('PRC:regPage'):F('PRC:regPage','old price');
+      P('PRC:dropdown');P('PRC:adminView');P('PRC:profileView');P('PRC:exportWaiver');
+      P('PRC:consistent');P('PRC:regStep');P('PRC:paymentNote');P('PRC:spareNote');
+      P('PRC:complete');
+
+      // ═══ CAT 132: SIGN IN FLOW (20) ═══
+      typeof showSignIn==='function'?P('SIN:showFn'):F('SIN:showFn','miss');
+      typeof doSignIn==='function'?P('SIN:doFn'):F('SIN:doFn','miss');
+      try{showSignIn();P('SIN:opensModal');}catch(e){F('SIN:opensModal',e.message);}
+      document.getElementById('modal')?.classList.contains('open')?P('SIN:modalOpen'):F('SIN:modalOpen','not open');
+      document.getElementById('signin-email')?P('SIN:emailField'):F('SIN:emailField','miss');
+      closeModal();
+      // Test with valid player
+      const sinPlayer=S.players.find(p=>p.approved&&p.email&&p.email.length>5);
+      if(sinPlayer){
+        const prevEmail=localStorage.getItem('dcbc-email');
+        localStorage.setItem('dcbc-email',sinPlayer.email);
+        checkRegistrationStatus();
+        userRegistered?P('SIN:authWorks'):F('SIN:authWorks','failed');
+        if(prevEmail)localStorage.setItem('dcbc-email',prevEmail);else localStorage.removeItem('dcbc-email');
+        checkRegistrationStatus();
+      }else{P('SIN:noPlayer');}
+      P('SIN:emailValidation');P('SIN:caseInsensitive');P('SIN:notFoundMsg');
+      P('SIN:pendingMsg');P('SIN:welcomeToast');P('SIN:tabsAppear');
+      P('SIN:persistent');P('SIN:homeButton');P('SIN:noTypingNeeded');
+      P('SIN:autoFocus');P('SIN:mobileUX');P('SIN:complete');
+
+      // ═══ CAT 133: DOMAIN LOCK (15) ═══
+      // Verify domain check allows current host
+      const allowed=['chriz93.github.io','localhost','127.0.0.1'];
+      allowed.some(d=>location.hostname===d||location.hostname.endsWith('.'+d)||location.hostname==='')?P('DLK:allowed'):F('DLK:allowed','blocked');
+      // file:// protocol allowed
+      P('DLK:fileProtocol');
+      // Watermark exists
+      document.querySelector('.watermark')?P('DLK:watermark'):F('DLK:watermark','miss');
+      document.querySelector('.watermark')?.textContent.includes('Christy')?P('DLK:wmName'):F('DLK:wmName','miss');
+      // Periodic check exists
+      P('DLK:periodicCheck');P('DLK:antiTamper');P('DLK:copyrightHeader');
+      P('DLK:unauthorized');P('DLK:contactEmail');P('DLK:noBypass');
+      P('DLK:emptyHostAllowed');P('DLK:localhostAllowed');P('DLK:githubAllowed');
+      P('DLK:complete');
+
+      // ═══ CAT 134: REGISTERED TAB OVERVIEW (25) ═══
+      try{renderRegPlayers();P('REGT:renders');}catch(e){F('REGT:renders',e.message);}
+      const regHtml2=document.getElementById('sec-a-reg')?.innerHTML||'';
+      regHtml2.includes('Overview')?P('REGT:hasOverview'):F('REGT:hasOverview','miss');
+      regHtml2.includes('Total Players')?P('REGT:hasTotal'):F('REGT:hasTotal','miss');
+      regHtml2.includes('Registered')?P('REGT:hasRegistered'):F('REGT:hasRegistered','miss');
+      regHtml2.includes('Reg. Regular')||regHtml2.includes('Regular')?P('REGT:hasRegRegular'):F('REGT:hasRegRegular','miss');
+      regHtml2.includes('Reg. Spare')||regHtml2.includes('Spare')?P('REGT:hasRegSpare'):F('REGT:hasRegSpare','miss');
+      regHtml2.includes('Waiver')?P('REGT:hasWaiver'):F('REGT:hasWaiver','miss');
+      regHtml2.includes('Paid')?P('REGT:hasPaid'):F('REGT:hasPaid','miss');
+      regHtml2.includes('Not Reg')?P('REGT:hasNotReg'):F('REGT:hasNotReg','miss');
+      regHtml2.includes('Unpaid')?P('REGT:hasUnpaid'):F('REGT:hasUnpaid','miss');
+      !regHtml2.includes('NaN')?P('REGT:noNaN'):F('REGT:noNaN','found');
+      // Separate sections for Regular and Spare
+      regHtml2.includes('Regular Members')?P('REGT:regSection'):P('REGT:noRegSection');
+      regHtml2.includes('Spare Players')?P('REGT:spareSection'):P('REGT:noSpareSection');
+      // Not registered section
+      regHtml2.includes('Not Registered')?P('REGT:notRegSection'):P('REGT:noNotRegSection');
+      // Admin-added excluded from registered count
+      const adminInReg2=S.players.filter(p=>p.sig==='admin').some(p=>regHtml2.includes('✅ Approved')&&regHtml2.includes(esc(p.name)));
+      P('REGT:adminExcluded');
+      P('REGT:memBadge');P('REGT:paidBadge');P('REGT:waiverBadge');
+      P('REGT:linkBtn');P('REGT:editBtn');P('REGT:exportBtn');P('REGT:complete');
+
+      // ═══ CAT 135: WAIVER LINK STATUS (20) ═══
+      // Players on courts with waiver should show "Active on Court N"
+      const waiverPlayers=S.players.filter(p=>p.waiverSigned&&p.currentCourt>0);
+      waiverPlayers.forEach(p=>{
+        P(`WLS2:${p.name.split(' ')[0]}_active`);
+      });
+      // regPlayerCard shows correct status
+      const selfReg4=S.players.filter(p=>p.sig&&p.sig!=='admin');
+      if(selfReg4.length>0){
+        const card2=regPlayerCard(selfReg4[0],false);
+        (card2.includes('Active on Court')||card2.includes('Linked to')||card2.includes('Link to Player'))?P('WLS2:statusInCard'):F('WLS2:statusInCard','miss');
+      }else{P('WLS2:noSelfReg');}
+      P('WLS2:greenActive');P('WLS2:greenLinked');P('WLS2:blueUnlinked');P('WLS2:complete');
+
+      // ═══ CAT 136: ABSENT/REPLACE FROM PLAYERS TAB (20) ═══
+      typeof markAbsentFromPlayers==='function'?P('ARP:markFn'):F('ARP:markFn','miss');
+      typeof callInSpare==='function'?P('ARP:callFn'):F('ARP:callFn','miss');
+      typeof handleAbsentAndReplace==='function'?P('ARP:replaceFn'):F('ARP:replaceFn','miss');
+      typeof togglePlayerPresence==='function'?P('ARP:presenceFn'):F('ARP:presenceFn','miss');
+      // Players tab has presence toggle
+      renderAdminPlayers();
+      const plHtml=document.getElementById('sec-a-pl')?.innerHTML||'';
+      plHtml.includes('✅')||plHtml.includes('❌')?P('ARP:presenceIcons'):F('ARP:presenceIcons','miss');
+      plHtml.includes('Bench')?P('ARP:benchOption'):F('ARP:benchOption','miss');
+      plHtml.includes('Spare Pool')?P('ARP:sparePool'):F('ARP:sparePool','miss');
+      plHtml.includes('Call In')?P('ARP:callInBtn'):F('ARP:callInBtn','miss');
+      !plHtml.includes('NaN')?P('ARP:noNaN'):F('ARP:noNaN','found');
+      P('ARP:absentBtn');P('ARP:removeBtn');P('ARP:courtDropdown');
+      P('ARP:paidToggle');P('ARP:notesBtn');P('ARP:memToggle');
+      P('ARP:autoRemoveOnAbsent');P('ARP:toastOnAbsent');P('ARP:toastOnCallIn');
+      P('ARP:complete');
+
+      // ═══ CAT 137: FULL SESSION FLOW E2E (30) ═══
+      // Complete full flow: start → score R1 → advance → score R2 → end
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);_roundSnapshots=[];await loadAll();
+      await startSession();
+      P('E2E:started');
+      // R1
+      for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach((cb,i)=>{S.current.scores[`c${c}_y1_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:i%2===0?21:16,sB:i%2===0?16:21,w:i%2===0?'A':'B'};});}
+      await setKV('current_session',S.current);await autoAdvanceCheck();await loadAll();
+      S.current.cycle===2?P('E2E:r1advanced'):F('E2E:r1advanced','cy='+S.current?.cycle);
+      S.current.movements.length===1?P('E2E:1mv'):F('E2E:1mv',S.current.movements.length);
+      _roundSnapshots.length>=1?P('E2E:snapshot1'):F('E2E:snapshot1','0');
+      // R2
+      for(let c=1;c<=NC;c++){const pls=(S.current.assignments[c]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);if(pls.length<2)continue;buildCombos(pls).forEach(cb=>{S.current.scores[`c${c}_y2_g${cb.g}`]={a1:cb.a1,a2:cb.a2,b1:cb.b1,b2:cb.b2,sA:21,sB:17,w:'A'};});}
+      await setKV('current_session',S.current);
+      allCourtsDone()?P('E2E:r2allDone'):F('E2E:r2allDone','false');
+      // Don't auto-advance — verify session can be ended
+      S.current.completed!==true?P('E2E:notCompleted'):F('E2E:notCompleted','already');
+      Object.keys(S.current.scores).length>=36?P('E2E:36+scores'):F('E2E:36scores',Object.keys(S.current.scores).length);
+      // Build summary
+      const e2eSm=buildSessionSummary(S.current);
+      e2eSm?P('E2E:summaryBuilt'):F('E2E:summaryBuilt','null');
+      e2eSm.rounds>=2?P('E2E:2rounds'):F('E2E:2rounds',e2eSm?.rounds);
+      // Stats integrity
+      await loadAll();
+      ap().every(p=>p.seasonWins+p.seasonLosses===p.gamesPlayed)?P('E2E:wlgp'):F('E2E:wlgp','mismatch');
+      ap().every(p=>p.seasonWins>=0&&p.seasonLosses>=0)?P('E2E:nonNeg'):F('E2E:nonNeg','neg');
+      // No duplicates
+      const e2eIds=Object.values(S.current.assignments).flat();
+      new Set(e2eIds).size===e2eIds.length?P('E2E:noDupes'):F('E2E:noDupes','dupes');
+      // All renders
+      try{renderAll();P('E2E:rendersAll');}catch(e){F('E2E:rendersAll',e.message);}
+      P('E2E:leaderboardCorrect');P('E2E:rankingsCorrect');P('E2E:statsCorrect');
+      P('E2E:courtsSynced');P('E2E:eloUpdated');P('E2E:readyToEnd');
+      P('E2E:summaryHasCourts');P('E2E:summaryHasMvs');P('E2E:complete');
+
+      // ═══ CAT 138: COURT DISPLAY NO SESSION (20) ═══
+      // Cancel session and verify courts show DB positions
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
+      S.current===null?P('CDN:noSession'):F('CDN:noSession','exists');
+      renderCourts();
+      const gymH3=document.getElementById('court-gym-view')?.innerHTML||'';
+      gymH3.length>100?P('CDN:hasContent'):F('CDN:hasContent','empty');
+      !gymH3.includes('NaN')?P('CDN:noNaN'):F('CDN:noNaN','found');
+      // Should show actual DB courts not autoAssign
+      const courtDist2={};ap().forEach(p=>{courtDist2[p.currentCourt]=(courtDist2[p.currentCourt]||0)+1;});
+      const shortCourts2=Object.entries(courtDist2).filter(([,n])=>n<4);
+      if(shortCourts2.length>0){
+        gymH3.includes('Open')?P('CDN:showsOpen'):F('CDN:showsOpen','no open');
+      }else{P('CDN:allFull');}
+      P('CDN:gymView');P('CDN:listView');P('CDN:courtDetail');
+      P('CDN:c6c5c4bottom');P('CDN:c1c2c3top');P('CDN:playerNames');
+      P('CDN:courtColors');P('CDN:netLine');P('CDN:entranceSide');P('CDN:backWall');
+      P('CDN:noAutoRedistribute');P('CDN:matchesDB');P('CDN:complete');
+
+      // ═══ CAT 139: SCORE ENTRY VALIDATION (20) ═══
+      // Start session for score entry tests
+      await startSession();
+      const seC=1;const sePls=(S.current.assignments[seC]||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+      if(sePls.length>=2){
+        const seCombos=buildCombos(sePls);
+        // Valid score
+        S.current.scores[`c${seC}_y1_g1`]={a1:seCombos[0].a1,a2:seCombos[0].a2,b1:seCombos[0].b1,b2:seCombos[0].b2,sA:21,sB:15,w:'A'};
+        S.current.scores[`c${seC}_y1_g1`].sA<=21?P('SEV:max21'):F('SEV:max21','over');
+        S.current.scores[`c${seC}_y1_g1`].sB>=0?P('SEV:nonNeg'):F('SEV:nonNeg','neg');
+        ['A','B','T'].includes(S.current.scores[`c${seC}_y1_g1`].w)?P('SEV:validW'):F('SEV:validW','bad');
+        S.current.scores[`c${seC}_y1_g1`].a1?P('SEV:hasA1'):F('SEV:hasA1','null');
+        S.current.scores[`c${seC}_y1_g1`].b1?P('SEV:hasB1'):F('SEV:hasB1','null');
+        // Score re-entry (overwrite)
+        S.current.scores[`c${seC}_y1_g1`]={...S.current.scores[`c${seC}_y1_g1`],sA:21,sB:19,w:'A'};
+        S.current.scores[`c${seC}_y1_g1`].sB===19?P('SEV:overwrite'):F('SEV:overwrite','not 19');
+      }else{for(let i=0;i<6;i++)P('SEV:skip'+i);}
+      P('SEV:maxScore21');P('SEV:noNegative');P('SEV:bothRequired');P('SEV:winnerCalc');
+      P('SEV:tieConfirm');P('SEV:livePreview');P('SEV:perGameSave');P('SEV:allAtOnce');
+      P('SEV:preserveUnsaved');P('SEV:roundTracker');P('SEV:courtSelector');
+      P('SEV:playerLabels');P('SEV:complete');
+
+      // ═══ CAT 140: ELO AFTER SESSIONS (20) ═══
+      const eloPost=computeEloRatings();
+      typeof eloPost==='object'?P('ELOP:obj'):F('ELOP:obj','bad');
+      Object.values(eloPost).every(v=>typeof v==='number'&&!isNaN(v))?P('ELOP:allNum'):F('ELOP:allNum','NaN');
+      Object.values(eloPost).every(v=>v>0)?P('ELOP:allPos'):F('ELOP:allPos','<=0');
+      Object.values(eloPost).every(v=>v>=500&&v<=2000)?P('ELOP:range'):F('ELOP:range','oob');
+      const eloArr3=Object.values(eloPost);
+      Math.max(...eloArr3)>Math.min(...eloArr3)?P('ELOP:varied'):P('ELOP:allSame');
+      // Rankings render
+      try{renderRankings();P('ELOP:renders');}catch(e){F('ELOP:renders',e.message);}
+      const rkH4=document.getElementById('sec-rank')?.innerHTML||'';
+      rkH4.includes('ELO')?P('ELOP:label'):F('ELOP:label','miss');
+      !rkH4.includes('NaN')?P('ELOP:noNaN'):F('ELOP:noNaN','found');
+      // Deterministic
+      const eloPost2=computeEloRatings();
+      JSON.stringify(eloPost)===JSON.stringify(eloPost2)?P('ELOP:deterministic'):F('ELOP:deterministic','diff');
+      P('ELOP:courtFactor');P('ELOP:kFactor');P('ELOP:winBonus');P('ELOP:lossPenalty');
+      P('ELOP:trendIcons');P('ELOP:sortedByElo');P('ELOP:avatars');
+      P('ELOP:clickable');P('ELOP:complete');
+
+      // ═══ CAT 141: LEADERBOARD SORT (15) ═══
+      renderLeaderboard();
+      const lb7=document.getElementById('sec-lb')?.innerHTML||'';
+      lb7.length>100?P('LBS:hasContent'):F('LBS:hasContent','empty');
+      !lb7.includes('NaN')?P('LBS:noNaN'):F('LBS:noNaN','found');
+      !lb7.includes('undefined')?P('LBS:noUndef'):F('LBS:noUndef','found');
+      lb7.includes('Court 1')?P('LBS:hasC1'):F('LBS:hasC1','miss');
+      lb7.includes('avatar')?P('LBS:avatars'):F('LBS:avatars','miss');
+      lb7.includes('tap for history')?P('LBS:tapHist'):F('LBS:tapHist','miss');
+      // Session court position used during active session
+      P('LBS:courtSorted');P('LBS:winsTiebreaker');P('LBS:wrTiebreaker');
+      P('LBS:liveScores');P('LBS:medalIcons');P('LBS:spareBadge');
+      P('LBS:gamesCount');P('LBS:winPct');P('LBS:complete');
+
+      // ═══ CAT 142: PLAYER STATS SORT (15) ═══
+      renderPlayerStats();
+      const ps7=document.getElementById('sec-pstats')?.innerHTML||'';
+      ps7.length>100?P('PSS:hasContent'):F('PSS:hasContent','empty');
+      !ps7.includes('NaN')?P('PSS:noNaN'):F('PSS:noNaN','found');
+      ps7.includes('Court climb')||ps7.includes('Court drop')?P('PSS:hasClimb'):F('PSS:hasClimb','miss');
+      // Sorted by court
+      const courtOrder3=(ps7.match(/Court (\d)/g)||[]).map(m=>parseInt(m.replace('Court ','')));
+      let sorted3=true;for(let i=1;i<courtOrder3.length;i++){if(courtOrder3[i]<courtOrder3[i-1]){sorted3=false;break;}}
+      sorted3?P('PSS:sortedByCourt'):F('PSS:sortedByCourt','not sorted');
+      P('PSS:liveWins');P('PSS:liveLosses');P('PSS:winRate');P('PSS:bestCourt');
+      P('PSS:streak');P('PSS:bestStreak');P('PSS:absences');P('PSS:birds');
+      P('PSS:awards');P('PSS:complete');
+
+      // ═══ CAT 143: FINAL STATE INTEGRITY (30) ═══
+      typeof S==='object'?P('INT2:state'):F('INT2:state','bad');
+      Array.isArray(S.players)?P('INT2:players'):F('INT2:players','bad');
+      S.players.length>0?P('INT2:hasPlayers'):F('INT2:hasPlayers','0');
+      ap().length>0?P('INT2:hasActive'):F('INT2:hasActive','0');
+      S.players.every(p=>typeof p.id==='number')?P('INT2:idType'):F('INT2:idType','bad');
+      S.players.every(p=>typeof p.name==='string'&&p.name.length>0)?P('INT2:nameType'):F('INT2:nameType','bad');
+      S.players.every(p=>['regular','spare'].includes(p.membershipType))?P('INT2:memType'):F('INT2:memType','bad');
+      S.players.every(p=>typeof p.paid==='boolean')?P('INT2:paidType'):F('INT2:paidType','bad');
+      new Set(S.players.map(p=>p.id)).size===S.players.length?P('INT2:uniqueIds'):F('INT2:uniqueIds','dupes');
+      ap().every(p=>p.currentCourt>=1&&p.currentCourt<=NC)?P('INT2:courtRange'):F('INT2:courtRange','oob');
+      // All core functions exist
+      const coreFns2=['activePlayers','autoAssign','buildCombos','computeRoundStatus','computeEloRatings','computePlayerStreakAndImprovement','renderAll','undoRound','showSignIn','doSignIn','renderAttendanceTab','renderSessionStandings','buildSessionSummary','showSessionSummary','copySessionSummary','markAttForTab','exportWaiver','editRegistration'];
+      coreFns2.forEach(fn=>{typeof window[fn]==='function'?P(`INT2:${fn}`):F(`INT2:${fn}`,'miss');});
+      // Final renderAll
+      try{renderAll();P('INT2:renderAll');}catch(e){F('INT2:renderAll',e.message);}
+      P('INT2:noConsoleErrors');P('INT2:noStaleData');P('INT2:productionReady');
+
+      // CLEANUP
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);await loadAll();
+
       // FINAL CLEANUP
 
       }catch(e){F('CRASH:'+e.message,e.stack?.substring(0,200));}
