@@ -3135,20 +3135,22 @@ function renderHeatmap(){
     </div>
   </div>`;
 }
+let _expandedHist={};// Track which sessions are expanded
 function renderHistory(){
   const el=document.getElementById('sec-hist');if(!el)return;
   if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">📅</div><div class="em">No completed sessions yet</div></div>';return;}
-  el.innerHTML=[...S.sessions].reverse().map((s,idx)=>`
-    <div class="card">
-      <div class="flex-between" style="cursor:pointer;" onclick="document.getElementById('hist-d-${idx}').style.display=document.getElementById('hist-d-${idx}').style.display==='none'?'block':'none'">
+  el.innerHTML=[...S.sessions].reverse().map((s,idx)=>{
+    const rndCount=new Set(Object.keys(s.scores||{}).map(k=>{const m=k.match(/_y(\d+)_/);return m?parseInt(m[1]):0;})).size;
+    const isExpanded=_expandedHist[idx];
+    return `<div class="card">
+      <div class="flex-between" style="cursor:pointer;" onclick="_expandedHist[${idx}]=!_expandedHist[${idx}];renderHistory();">
         <div style="font-weight:800;">Session ${s.number} — ${s.date}, 2026</div>
-        <div style="display:flex;gap:4px;"><span class="tag tg-teal">${(s.movements||[]).length+1} rounds</span><span class="tag tg-green">${Object.keys(s.scores||{}).length} games</span></div>
+        <div style="display:flex;gap:4px;"><span class="tag tg-teal">${rndCount} rounds</span><span class="tag tg-green">${Object.keys(s.scores||{}).length} games</span></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px;">Tap to expand round-by-round scores</div>
-      <div id="hist-d-${idx}" style="display:none;margin-top:10px;">
-        ${renderSessionScores(s)}
-      </div>
-    </div>`).join('');
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;">${isExpanded?'Tap to collapse':'Tap to expand scores'}</div>
+      ${isExpanded?'<div style="margin-top:10px;">'+renderSessionScores(s)+'</div>':''}
+    </div>`;
+  }).join('');
 }
 function renderSessionScores(s){
   let html='';
@@ -3168,9 +3170,8 @@ function renderSessionScores(s){
           const ta=[sc.a1,sc.a2].filter(x=>x!=null).map(pm).join(' & ');
           const tb=[sc.b1,sc.b2].filter(x=>x!=null).map(pm).join(' & ');
           const winCls=sc.w==='A'?'color:var(--green2)':sc.w==='B'?'color:var(--green2)':'color:var(--yellow2)';
-          courtHtml+=`<div style="font-size:10px;padding:2px 0;display:flex;justify-content:space-between;">
-            <span>${esc(ta)} <strong>${sc.sA}</strong> — <strong>${sc.sB}</strong> ${esc(tb)}</span>
-            <span style="${sc.w==='A'?'color:var(--green2)':'color:var(--red2)'};font-weight:700;font-size:9px;">${sc.w==='A'?ta.split(' ')[0]+' wins':tb.split(' ')[0]+' wins'}</span>
+          courtHtml+=`<div style="font-size:10px;padding:2px 0;">
+            <span style="${sc.w==='A'?'color:var(--green2);font-weight:700':''}">${esc(ta)}</span> <strong>${sc.sA}</strong> — <strong>${sc.sB}</strong> <span style="${sc.w==='B'?'color:var(--green2);font-weight:700':''}">${esc(tb)}</span>
           </div>`;
         }
       }
