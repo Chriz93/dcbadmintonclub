@@ -3153,19 +3153,34 @@ function renderSessionStandings(){
       if(sc.w==='A'){sa.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});sb.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});}
       else if(sc.w==='B'){sb.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});sa.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});}
     });
-    // Find starting court for each player (from initialAssignments or first assignments)
+    // Find starting court (where they began the session)
     const startCourt={};
     const initA=s.initialAssignments||s.assignments;
     for(let c=1;c<=NC;c++){(initA[c]||[]).forEach(id=>startCourt[id]=c);}
-    // Find ending court (current assignments = after all rotations)
-    const endCourt={};
-    for(let c=1;c<=NC;c++){(s.assignments[c]||[]).forEach(id=>endCourt[id]=c);}
+    // Compute post-rotation courts (where they END UP after all rotations)
+    const postRotation={};for(let c=1;c<=NC;c++)postRotation[c]=[];
+    const lastMv=s.movements?.length>0?s.movements[s.movements.length-1]:null;
+    if(lastMv&&lastMv.mv){
+      Object.values(s.assignments).flat().forEach(id=>{
+        let from=0;for(let c2=1;c2<=NC;c2++){if((s.assignments[c2]||[]).includes(id)){from=c2;break;}}
+        const dir=lastMv.mv[id];
+        let to=from;
+        if(dir==='up')to=Math.max(1,from-1);
+        if(dir==='down')to=Math.min(NC,from+1);
+        postRotation[to].push(id);
+      });
+    }else{
+      // No movements — use assignments as-is
+      for(let c=1;c<=NC;c++)postRotation[c]=[...(s.assignments[c]||[])];
+    }
+    // Handle overflow after rotation
+    for(let c=1;c<=NC;c++){while(postRotation[c].length>4){const ov=postRotation[c].pop();const t=c<NC?c+1:c-1;postRotation[t].unshift(ov);}}
     const rndCount=new Set(Object.keys(s.scores||{}).map(k=>{const m=k.match(/_y(\d+)_/);return m?parseInt(m[1]):0;})).size;
     html+=`<div class="card">
-      <div class="card-title">Session ${s.number} — ${s.date}, 2026 · ${rndCount} Rounds</div>`;
-    // Show courts based on ENDING position (where they finished)
+      <div class="card-title">Session ${s.number} — ${s.date}, 2026 · ${rndCount} Rounds · Final Standings</div>`;
+    // Show courts based on POST-ROTATION position (next week's starting courts)
     for(let c=1;c<=NC;c++){
-      const pids=s.assignments[c]||[];
+      const pids=postRotation[c]||[];
       if(!pids.length)continue;
       const cls=c===1?'var(--gold)':c===2?'var(--silver)':c===3?'var(--bronze)':'var(--teal2)';
       const sorted=[...pids].sort((a,b)=>(playerWins[b]||0)-(playerWins[a]||0));
@@ -3178,7 +3193,7 @@ function renderSessionStandings(){
         const gp=playerGP[id]||0;
         const wr=gp>0?Math.round(w/gp*100):0;
         const sc=startCourt[id]||c;
-        const ec=endCourt[id]||c;
+        const ec=c; // c is the post-rotation court
         let mvText='';
         if(sc<ec)mvText=`<span style="color:var(--red2);font-size:9px;"> (↓ C${sc}→C${ec})</span>`;
         else if(sc>ec)mvText=`<span style="color:var(--green2);font-size:9px;"> (↑ C${sc}→C${ec})</span>`;
