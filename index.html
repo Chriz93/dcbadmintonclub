@@ -1838,7 +1838,9 @@ async function endSession(){
 }
 function buildSessionSummary(sess){
   if(!sess)return null;
-  const sm={number:sess.number,date:sess.date,rounds:sess.movements.length+(sess.completed?1:0),totalScores:Object.keys(sess.scores).length};
+  // Count actual rounds from score keys (c1_y1_g1 → round 1, c1_y2_g1 → round 2, etc.)
+  const roundNums=new Set(Object.keys(sess.scores).map(k=>{const m=k.match(/_y(\d+)_/);return m?parseInt(m[1]):0;}));
+  const sm={number:sess.number,date:sess.date,rounds:roundNums.size,totalScores:Object.keys(sess.scores).length};
   // Players who participated
   const playerIds=new Set(Object.values(sess.assignments).flat());
   sm.players=S.players.filter(p=>playerIds.has(p.id)).map(p=>({id:p.id,name:p.name,court:0,wins:p.seasonWins,losses:p.seasonLosses,gp:p.gamesPlayed}));
@@ -3151,7 +3153,8 @@ function renderHistory(){
 function renderSessionScores(s){
   let html='';
   const pm=id=>{const p=S.players.find(x=>x.id===id);return p?p.name.split(' ')[0]:'?';};
-  const maxCy=(s.movements||[]).length+1;
+  const roundNums2=new Set(Object.keys(s.scores||{}).map(k=>{const m=k.match(/_y(\d+)_/);return m?parseInt(m[1]):0;}));
+  const maxCy=Math.max(...roundNums2,1);
   for(let cy=1;cy<=maxCy;cy++){
     html+=`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Round ${cy}</div>`;
     for(let c=1;c<=NC;c++){
