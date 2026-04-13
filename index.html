@@ -4370,7 +4370,7 @@ if(window.location.hash==='#run-tests'){
     setTimeout(async()=>{
       localStorage.setItem('dcbc-invite','MAPLE2026');
       await new Promise(r=>setTimeout(r,3000)); // wait for init
-      adminUnlocked=true;updateNavVisibility();
+      adminUnlocked=true;_autoAdvancing=false;_roundSnapshots=[];updateNavVisibility();
       const R=[];
       const P=(n)=>R.push({n,s:'P'});
       const F=(n,r)=>R.push({n,s:'F',r});
@@ -7630,19 +7630,19 @@ if(window.location.hash==='#run-tests'){
       document.getElementById('sec-a-att')?P('ATAB:domEl'):F('ATAB:domEl','miss');
       // Render
       try{renderAttendanceTab();P('ATAB:renders');}catch(e){F('ATAB:renders',e.message);}
-      const attHtml=document.getElementById('sec-a-att')?.innerHTML||'';
-      attHtml.includes('Attendance')?P('ATAB:hasTitle'):F('ATAB:hasTitle','miss');
-      attHtml.includes('Present')?P('ATAB:hasPresent'):F('ATAB:hasPresent','miss');
-      attHtml.includes('Absent')?P('ATAB:hasAbsent'):F('ATAB:hasAbsent','miss');
-      attHtml.includes('Unmarked')?P('ATAB:hasUnmarked'):F('ATAB:hasUnmarked','miss');
-      attHtml.includes('Court 1')?P('ATAB:hasCourt1'):F('ATAB:hasCourt1','miss');
-      !attHtml.includes('NaN')?P('ATAB:noNaN'):F('ATAB:noNaN','found');
+      const attTabHtml=document.getElementById('sec-a-att')?.innerHTML||'';
+      attTabHtml.includes('Attendance')?P('ATAB:hasTitle'):F('ATAB:hasTitle','miss');
+      attTabHtml.includes('Present')?P('ATAB:hasPresent'):F('ATAB:hasPresent','miss');
+      attTabHtml.includes('Absent')?P('ATAB:hasAbsent'):F('ATAB:hasAbsent','miss');
+      attTabHtml.includes('Unmarked')?P('ATAB:hasUnmarked'):F('ATAB:hasUnmarked','miss');
+      attTabHtml.includes('Court 1')?P('ATAB:hasCourt1'):F('ATAB:hasCourt1','miss');
+      !attTabHtml.includes('NaN')?P('ATAB:noNaN'):F('ATAB:noNaN','found');
       // Players shown by court
-      for(let c=1;c<=NC;c++){attHtml.includes('Court '+c)?P(`ATAB:C${c}`):P(`ATAB:C${c}skip`);}
+      for(let c=1;c<=NC;c++){attTabHtml.includes('Court '+c)?P(`ATAB:C${c}`):P(`ATAB:C${c}skip`);}
       // Spare pool shown
-      attHtml.includes('Spare Pool')?P('ATAB:sparePool'):P('ATAB:noSparePool');
+      attTabHtml.includes('Spare Pool')?P('ATAB:sparePool'):P('ATAB:noSparePool');
       // Past attendance section
-      S.sessions.length>0?(attHtml.includes('Past Attendance')?P('ATAB:pastAtt'):F('ATAB:pastAtt','miss')):P('ATAB:noPastSess');
+      S.sessions.length>0?(attTabHtml.includes('Past Attendance')?P('ATAB:pastAtt'):F('ATAB:pastAtt','miss')):P('ATAB:noPastSess');
       // Mark attendance works
       const attTestId=S.current.assignments[1]?.[0];
       if(attTestId){
@@ -7705,8 +7705,8 @@ if(window.location.hash==='#run-tests'){
       typeof renderSessionScores==='function'?P('DHIST:scoresFn'):F('DHIST:scoresFn','miss');
       typeof _expandedHist==='object'?P('DHIST:expandVar'):F('DHIST:expandVar','miss');
       try{renderHistory();P('DHIST:renders');}catch(e){F('DHIST:renders',e.message);}
-      const histHtml=document.getElementById('sec-hist')?.innerHTML||'';
-      !histHtml.includes('NaN')?P('DHIST:noNaN'):F('DHIST:noNaN','found');
+      const histHtml2=document.getElementById('sec-hist')?.innerHTML||'';
+      !histHtml2.includes('NaN')?P('DHIST:noNaN'):F('DHIST:noNaN','found');
       // Expandable sessions
       P('DHIST:clickToExpand');P('DHIST:clickToCollapse');P('DHIST:preserveState');
       // Session scores detail
