@@ -769,7 +769,8 @@ textarea.inp{resize:vertical;min-height:80px;}
 (function(){
   const _ALLOWED=['chriz93.github.io','localhost','127.0.0.1'];
   const _h=window.location.hostname;
-  if(!_ALLOWED.some(d=>_h===d||_h.endsWith('.'+d))){
+  if(_h===''||window.location.protocol==='file:'){}// Allow local file access
+  else if(!_ALLOWED.some(d=>_h===d||_h.endsWith('.'+d))){
     document.body.innerHTML='<div style="background:#0a0e14;color:#e74c3c;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;flex-direction:column;padding:20px;text-align:center;"><h1>Unauthorized</h1><p>This application is licensed exclusively to DC Badminton Club.<br>Contact christygeorge993@gmail.com for licensing inquiries.</p></div>';
     throw new Error('Domain not authorized');
   }
