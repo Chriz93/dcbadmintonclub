@@ -1740,7 +1740,7 @@ async function applyRotation(){
       const p1=S.players.find(p=>p.id===scores[1].id);
       if(p0&&p1){
         let winner=null;
-        while(winner!=='1'&&winner!=='2'){winner=prompt(`Court ${c} TIE at the top!\n${p0.name} and ${p1.name} have the same score.\n\nWho won the toss? Enter 1 for ${p0.name} or 2 for ${p1.name}:`);if(winner===null){winner='1';break;}}
+        try{while(winner!=='1'&&winner!=='2'){winner=prompt(`Court ${c} TIE at the top!\n${p0.name} and ${p1.name} have the same score.\n\nWho won the toss? Enter 1 for ${p0.name} or 2 for ${p1.name}:`);if(winner===null){winner='1';break;}}}catch(e){winner='1';}
         if(winner==='2')tossResults[scores[0].id+'_'+scores[1].id]=scores[1].id;
         else tossResults[scores[0].id+'_'+scores[1].id]=scores[0].id;
       }
@@ -1752,7 +1752,7 @@ async function applyRotation(){
       const pP=S.players.find(p=>p.id===scores[prev].id);
       if(pL&&pP&&!tossResults[scores[prev].id+'_'+scores[last].id]){
         let winner2=null;
-        while(winner2!=='1'&&winner2!=='2'){winner2=prompt(`Court ${c} TIE at the bottom!\n${pP.name} and ${pL.name} have the same score.\n\nWho WON the toss (stays)? Enter 1 for ${pP.name} or 2 for ${pL.name}:`);if(winner2===null){winner2='1';break;}}
+        try{while(winner2!=='1'&&winner2!=='2'){winner2=prompt(`Court ${c} TIE at the bottom!\n${pP.name} and ${pL.name} have the same score.\n\nWho WON the toss (stays)? Enter 1 for ${pP.name} or 2 for ${pL.name}:`);if(winner2===null){winner2='1';break;}}}catch(e){winner2='1';}
         if(winner2==='2')tossResults[scores[prev].id+'_'+scores[last].id]=scores[last].id;
         else tossResults[scores[prev].id+'_'+scores[last].id]=scores[prev].id;
       }
