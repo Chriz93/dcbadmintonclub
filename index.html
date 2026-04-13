@@ -4207,12 +4207,9 @@ async function markAttForTab(id,status,court){
   }else if(status==='present'){
     toast(S.players.find(p=>p.id===id)?.name.split(' ')[0]+' confirmed present','success');
   }
-  // Debounced save
-  clearTimeout(_attSaveTimer);
-  _attSaveTimer=setTimeout(async()=>{
-    if(S.current)await setKV('current_session',S.current);
-    else await setKV('pre_session_attendance',S.preAttendance||{});
-  },1000);
+  // Save immediately (no debounce — attendance is critical)
+  if(S.current)await setKV('current_session',S.current);
+  else await setKV('pre_session_attendance',S.preAttendance||{});
   await loadAll();renderAttendanceTab();renderCourts();renderAdminPlayers();
 }
 async function saveAttendanceTab(){
