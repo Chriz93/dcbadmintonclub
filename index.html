@@ -3153,10 +3153,10 @@ function renderSessionStandings(){
       if(sc.w==='A'){sa.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});sb.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});}
       else if(sc.w==='B'){sb.forEach(id=>{playerWins[id]=(playerWins[id]||0)+1;});sa.forEach(id=>{playerLosses[id]=(playerLosses[id]||0)+1;});}
     });
-    // Find starting court (where they began the session)
+    // Find the court they played on in the LAST round (before final rotation)
+    // This is s.assignments — the last round's playing positions
     const startCourt={};
-    const initA=s.initialAssignments||s.assignments;
-    for(let c=1;c<=NC;c++){(initA[c]||[]).forEach(id=>startCourt[id]=c);}
+    for(let c=1;c<=NC;c++){(s.assignments[c]||[]).forEach(id=>startCourt[id]=c);}
     // Compute post-rotation courts (where they END UP after all rotations)
     const postRotation={};for(let c=1;c<=NC;c++)postRotation[c]=[];
     const lastMv=s.movements?.length>0?s.movements[s.movements.length-1]:null;
