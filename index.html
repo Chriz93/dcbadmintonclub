@@ -1426,7 +1426,8 @@ function renderRegPlayers(){
   const waiverUnsigned=S.players.filter(p=>!p.waiverSigned&&(p.currentCourt>0||p.sig!=='admin')).length;
   const paidCount=S.players.filter(p=>p.paid).length;
   const unpaidCount=S.players.filter(p=>!p.paid&&(p.currentCourt>0||p.sig!=='admin')).length;
-  const notRegistered=adminAdded.filter(p=>!p.waiverSigned);
+  // Not registered = admin-added without waiver AND no matching self-registered player
+  const notRegistered=adminAdded.filter(p=>!p.waiverSigned&&!selfReg.some(sr=>sr.name.toLowerCase().includes(p.name.split(' ')[0].toLowerCase())&&sr.waiverSigned));
   const regRegular=selfReg.filter(p=>p.membershipType!=='spare');
   const regSpare=selfReg.filter(p=>p.membershipType==='spare');
   const totalPlayers=S.players.length;
