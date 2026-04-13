@@ -797,6 +797,7 @@ let S={players:[],sessions:[],current:null,announcements:[],lastUndo:null,votes:
 let adminUnlocked=false;
 let courtView='gym';
 let regData={};
+let _roundSnapshots=[]; // Stack of pre-rotation snapshots for undo
 // Active players = those with court assignments (admin-added). Excludes registered-but-unassigned (court=0).
 function activePlayers(){return S.players.filter(p=>p.currentCourt>0);}
 
@@ -990,6 +991,7 @@ async function loadAll(){
     if(S.current){S.votes=await getKV(`votes_session_${S.current.number}`)||{};S.rsvp=await getKV(`rsvp_session_${S.current.number}`)||{};}
     S.qaQuestions=await getKV('qa_questions')||[];
     S.preAttendance=await getKV('pre_session_attendance')||{};
+    _roundSnapshots=await getKV('round_snapshots')||[];
     return true;
   }catch(e){return false;}
 }
@@ -1614,9 +1616,30 @@ async function autoAdvanceCheck(){
   if(!allCourtsDone())return;
   _autoAdvancing=true;
   toast('All courts done! Advancing to Round '+(cy+1)+'...','success');
-  try{await applyRotation();S.current.cycle++;await setKV('current_session',S.current);await loadAll();renderAll();}
+  try{
+    // Snapshot before rotation for undo
+    _roundSnapshots.push({cycle:S.current.cycle,assignments:JSON.parse(JSON.stringify(S.current.assignments)),scores:JSON.parse(JSON.stringify(S.current.scores)),movements:JSON.parse(JSON.stringify(S.current.movements)),playerStats:activePlayers().map(p=>({id:p.id,w:p.seasonWins,l:p.seasonLosses,gp:p.gamesPlayed}))});
+    await setKV('round_snapshots',_roundSnapshots);
+    await applyRotation();S.current.cycle++;await setKV('current_session',S.current);await loadAll();renderAll();}
   catch(e){toast('Advance error','error');}
   finally{_autoAdvancing=false;}
+}
+async function undoRound(){
+  if(!_roundSnapshots.length)return toast('No rounds to undo','warn');
+  if(!S.current)return toast('No active session','warn');
+  if(!confirm('Undo last round advancement? This reverts court assignments, movements, and player stats.'))return;
+  const snap=_roundSnapshots.pop();
+  S.current.cycle=snap.cycle;
+  S.current.assignments=snap.assignments;
+  S.current.scores=snap.scores;
+  S.current.movements=snap.movements;
+  // Revert player DB stats
+  const reverts=snap.playerStats.map(ps=>sbU('players',ps.id,{season_wins:ps.w,season_losses:ps.l,games_played:ps.gp}));
+  if(reverts.length)await Promise.all(reverts);
+  await setKV('current_session',S.current);
+  await setKV('round_snapshots',_roundSnapshots);
+  await loadAll();renderAll();
+  toast('Reverted to Round '+S.current.cycle+' — scores and stats restored','success');
 }
 async function resetSession(){
   if(!S.current)return toast('No active session','warn');
@@ -1643,6 +1666,9 @@ async function nextCycle(){
     for(let g=1;g<=numGames;g++)if(!S.current.scores[`c${c}_y${S.current.cycle}_g${g}`])missing.push(`C${c}G${g}`);
   }
   if(missing.length){toast(`Cannot advance — ${missing.length} scores missing: ${missing.slice(0,6).join(', ')}${missing.length>6?'...':''}`,'error');return;}
+  // Snapshot before rotation for undo
+  _roundSnapshots.push({cycle:S.current.cycle,assignments:JSON.parse(JSON.stringify(S.current.assignments)),scores:JSON.parse(JSON.stringify(S.current.scores)),movements:JSON.parse(JSON.stringify(S.current.movements)),playerStats:activePlayers().map(p=>({id:p.id,w:p.seasonWins,l:p.seasonLosses,gp:p.gamesPlayed}))});
+  await setKV('round_snapshots',_roundSnapshots);
   await applyRotation();S.current.cycle++;
   await setKV('current_session',S.current);await loadAll();renderAll();toast('Round '+S.current.cycle+'!','success');
 }
@@ -1659,6 +1685,35 @@ async function applyRotation(){
     side_a.forEach(id=>{pts[id]=(pts[id]||0)+sc.sA;ptFor[id]=(ptFor[id]||0)+sc.sA;ptAgainst[id]=(ptAgainst[id]||0)+sc.sB;gamesPlayedCycle[id]=(gamesPlayedCycle[id]||0)+1;});
     side_b.forEach(id=>{pts[id]=(pts[id]||0)+sc.sB;ptFor[id]=(ptFor[id]||0)+sc.sB;ptAgainst[id]=(ptAgainst[id]||0)+sc.sA;gamesPlayedCycle[id]=(gamesPlayedCycle[id]||0)+1;});
   }
+  // Detect ties and resolve via toss before sorting
+  const tossResults={};
+  for(let c=1;c<=NC;c++){
+    const pids=a[c]||[];if(pids.length<2)continue;
+    // Check if top or bottom positions have ties
+    const scores=pids.map(id=>({id,pts:pts[id]||0,diff:(ptFor[id]||0)-(ptAgainst[id]||0)}));
+    scores.sort((x,y)=>y.pts!==x.pts?y.pts-x.pts:y.diff!==x.diff?y.diff-x.diff:0);
+    // Check if position 0 and 1 are tied (affects who moves up)
+    if(scores.length>=2&&scores[0].pts===scores[1].pts&&(ptFor[scores[0].id]-ptAgainst[scores[0].id])===(ptFor[scores[1].id]-ptAgainst[scores[1].id])){
+      const p0=S.players.find(p=>p.id===scores[0].id);
+      const p1=S.players.find(p=>p.id===scores[1].id);
+      if(p0&&p1){
+        const winner=prompt(`Court ${c} TIE at the top!\n${p0.name} and ${p1.name} have the same score.\n\nWho won the toss? Enter 1 for ${p0.name} or 2 for ${p1.name}:`);
+        if(winner==='2')tossResults[scores[0].id+'_'+scores[1].id]=scores[1].id;
+        else tossResults[scores[0].id+'_'+scores[1].id]=scores[0].id;
+      }
+    }
+    // Check if last two are tied (affects who moves down)
+    const last=scores.length-1;const prev=scores.length-2;
+    if(prev>=0&&scores[last].pts===scores[prev].pts&&(ptFor[scores[last].id]-ptAgainst[scores[last].id])===(ptFor[scores[prev].id]-ptAgainst[scores[prev].id])&&(scores[last].id!==scores[0].id)){
+      const pL=S.players.find(p=>p.id===scores[last].id);
+      const pP=S.players.find(p=>p.id===scores[prev].id);
+      if(pL&&pP&&!tossResults[scores[prev].id+'_'+scores[last].id]){
+        const winner=prompt(`Court ${c} TIE at the bottom!\n${pP.name} and ${pL.name} have the same score.\n\nWho WON the toss (stays)? Enter 1 for ${pP.name} or 2 for ${pL.name}:`);
+        if(winner==='2')tossResults[scores[prev].id+'_'+scores[last].id]=scores[last].id;
+        else tossResults[scores[prev].id+'_'+scores[last].id]=scores[prev].id;
+      }
+    }
+  }
   const mv={},na={};for(let c=1;c<=NC;c++)na[c]=[];
   for(let c=1;c<=NC;c++){
     const pids=a[c]||[];if(pids.length<2){pids.forEach(id=>mv[id]='stay');continue;}
@@ -1668,7 +1723,11 @@ async function applyRotation(){
       const ptCmp = pts[b]-pts[a];
       if(ptCmp !== 0) return ptCmp;
       if(ptDiff_a !== ptDiff_b) return ptDiff_b - ptDiff_a;
-      return a - b;
+      // Toss resolution: check if we have a result for this pair
+      const tKey1=a+'_'+b,tKey2=b+'_'+a;
+      if(tossResults[tKey1])return tossResults[tKey1]===a?-1:1;
+      if(tossResults[tKey2])return tossResults[tKey2]===a?-1:1;
+      return a - b; // fallback to ID if no toss
     });
     sorted.forEach((id,i)=>{if(i===0&&c>1)mv[id]='up';else if(i===sorted.length-1&&c<NC)mv[id]='down';else mv[id]='stay';});
   }
@@ -1681,7 +1740,7 @@ async function applyRotation(){
   });
   for(let c=1;c<=NC;c++)while(na[c].length>4){const ov=na[c].pop();const t=c<NC?c+1:c-1;na[t].unshift(ov);}
   S.current.assignments=na;
-  S.current.movements.push({cycle:cy,mv,wins:{...wins},pts:{...pts}});
+  S.current.movements.push({cycle:cy,mv,wins:{...wins},pts:{...pts},tosses:tossResults});
   // Update DB with actual games played this cycle per player
   const rotationStatUpdates=[];
   Object.entries(wins).forEach(([id,w])=>{
@@ -1965,6 +2024,7 @@ function renderSessionAdmin(){
     <div class="card"><div class="card-title">Controls</div>
       <button class="btn btn-primary" onclick="nextCycle()">⏭ Next Round (Rotate)</button>
       <button class="btn btn-success" onclick="endSession()">✅ End & Save Session</button>
+      <button class="btn btn-ghost" onclick="undoRound()" ${_roundSnapshots.length?'':'disabled'}>↩ Undo Last Round${_roundSnapshots.length?' ('+_roundSnapshots.length+' available)':''}</button>
       <button class="btn btn-warn" onclick="resetSession()">🔄 Reset Session (Clear Scores)</button>
       <button class="btn btn-danger" onclick="cancelSession()">✕ Cancel Session</button>
     </div>
@@ -3076,17 +3136,68 @@ function renderHeatmap(){
 function renderHistory(){
   const el=document.getElementById('sec-hist');if(!el)return;
   if(!S.sessions.length){el.innerHTML='<div class="empty-state"><div class="ei">📅</div><div class="em">No completed sessions yet</div></div>';return;}
-  el.innerHTML=[...S.sessions].reverse().map(s=>`
-    <div class="card"><div class="flex-between" style="margin-bottom:8px;">
-      <div style="font-weight:800;">Session ${s.number} — ${s.date}, 2026</div>
-      <span class="tag tg-green">✓ Done</span></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;">
-        ${Object.entries(s.assignments||{}).map(([c,ids])=>`
-          <div style="background:var(--s2);border-radius:7px;padding:7px;font-size:11px;">
-            <div style="color:var(--teal);font-weight:800;margin-bottom:3px;">C${c}</div>
-            ${(ids||[]).map(id=>{const p=S.players.find(x=>x.id===id);return p?`<div>${esc(p.name.split(' ')[0])}</div>`:'';}).join('')}
-          </div>`).join('')}
-      </div></div>`).join('');
+  el.innerHTML=[...S.sessions].reverse().map((s,idx)=>`
+    <div class="card">
+      <div class="flex-between" style="cursor:pointer;" onclick="document.getElementById('hist-d-${idx}').style.display=document.getElementById('hist-d-${idx}').style.display==='none'?'block':'none'">
+        <div style="font-weight:800;">Session ${s.number} — ${s.date}, 2026</div>
+        <div style="display:flex;gap:4px;"><span class="tag tg-teal">${(s.movements||[]).length+1} rounds</span><span class="tag tg-green">${Object.keys(s.scores||{}).length} games</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;">Tap to expand round-by-round scores</div>
+      <div id="hist-d-${idx}" style="display:none;margin-top:10px;">
+        ${renderSessionScores(s)}
+      </div>
+    </div>`).join('');
+}
+function renderSessionScores(s){
+  let html='';
+  const pm=id=>{const p=S.players.find(x=>x.id===id);return p?p.name.split(' ')[0]:'?';};
+  const maxCy=(s.movements||[]).length+1;
+  for(let cy=1;cy<=maxCy;cy++){
+    html+=`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:800;color:var(--teal);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Round ${cy}</div>`;
+    for(let c=1;c<=NC;c++){
+      let hasScores=false;
+      let courtHtml=`<div style="background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:6px;margin-bottom:4px;">
+        <div style="font-size:10px;font-weight:800;color:${c<=3?c===1?'var(--gold)':c===2?'var(--silver)':'var(--bronze)':'var(--teal2)'};">Court ${c}</div>`;
+      for(let g=1;g<=NG;g++){
+        const sc=s.scores?.[`c${c}_y${cy}_g${g}`];
+        if(sc){
+          hasScores=true;
+          const ta=[sc.a1,sc.a2].filter(x=>x!=null).map(pm).join(' & ');
+          const tb=[sc.b1,sc.b2].filter(x=>x!=null).map(pm).join(' & ');
+          const winCls=sc.w==='A'?'color:var(--green2)':sc.w==='B'?'color:var(--green2)':'color:var(--yellow2)';
+          courtHtml+=`<div style="font-size:10px;padding:2px 0;display:flex;justify-content:space-between;">
+            <span>${esc(ta)} <strong>${sc.sA}</strong> — <strong>${sc.sB}</strong> ${esc(tb)}</span>
+            <span style="${sc.w==='A'?'color:var(--green2)':'color:var(--red2)'};font-weight:700;font-size:9px;">${sc.w==='A'?ta.split(' ')[0]+' wins':tb.split(' ')[0]+' wins'}</span>
+          </div>`;
+        }
+      }
+      courtHtml+=`</div>`;
+      if(hasScores)html+=courtHtml;
+    }
+    // Show movements after this round
+    const mvData=(s.movements||[]).find(m=>m.cycle===cy);
+    if(mvData?.mv){
+      const ups=Object.entries(mvData.mv).filter(([,d])=>d==='up').map(([id])=>pm(parseInt(id)));
+      const downs=Object.entries(mvData.mv).filter(([,d])=>d==='down').map(([id])=>pm(parseInt(id)));
+      if(ups.length||downs.length){
+        html+=`<div style="font-size:10px;margin:4px 0 8px;padding:4px 8px;background:var(--s1);border-radius:4px;">
+          ${ups.length?'<span style="color:var(--green2);">⬆ '+ups.join(', ')+'</span> ':''}
+          ${downs.length?'<span style="color:var(--red2);">⬇ '+downs.join(', ')+'</span>':''}
+          ${mvData.tosses&&Object.keys(mvData.tosses).length?'<span style="color:var(--yellow2);"> 🪙 Toss used</span>':''}
+        </div>`;
+      }
+    }
+    html+=`</div>`;
+  }
+  // Bird distribution
+  if(s.birdDistribution&&Object.keys(s.birdDistribution).length){
+    html+=`<div style="font-size:11px;font-weight:800;color:var(--teal);margin:6px 0 4px;">🪶 Birds</div>`;
+    Object.entries(s.birdDistribution).forEach(([c,bd])=>{
+      const recip=(bd.recipients||[]).map(r=>pm(r.playerId)+'('+r.birdsReceived+'🪶)');
+      html+=`<div style="font-size:10px;">C${c}: ${recip.join(', ')}</div>`;
+    });
+  }
+  return html;
 }
 
 // ══════════════════════════════════════════════
