@@ -4105,10 +4105,17 @@ function renderAttendanceTab(){
   // Build attendance by court
   let html=`<div class="card"><div class="card-title">📋 Session ${sessionNum} Attendance</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Mark players present or absent. Absent players are auto-removed from their court. Call in spares to fill open slots.</div>`;
-  // Count stats
-  const presentCount=Object.values(att).filter(v=>v==='present').length;
-  const absentCount=Object.values(att).filter(v=>v==='absent').length;
-  const unmarkedCount=activePlayers().length-presentCount-absentCount;
+  // Count stats — only players currently on courts (not spare pool)
+  const courtPlayerIds=new Set();
+  for(let c=1;c<=NC;c++){
+    let cpids;
+    if(S.current){cpids=S.current.assignments[c]||[];}
+    else{cpids=activePlayers().filter(p=>p.currentCourt===c).map(p=>p.id);}
+    cpids.forEach(id=>courtPlayerIds.add(id));
+  }
+  const presentCount=[...courtPlayerIds].filter(id=>att[id]==='present').length;
+  const absentCount=[...courtPlayerIds].filter(id=>att[id]==='absent').length;
+  const unmarkedCount=courtPlayerIds.size-presentCount-absentCount;
   html+=`<div style="display:flex;gap:8px;margin-bottom:12px;">
     <span class="tag tg-green">✅ ${presentCount} Present</span>
     <span class="tag tg-red">❌ ${absentCount} Absent</span>
@@ -4154,15 +4161,25 @@ function renderAttendanceTab(){
   }
   // Save button
   html+=`<button class="btn btn-primary" onclick="saveAttendanceTab()">💾 Save Attendance</button>`;
-  // History of past session attendance
+  // History of past session attendance — clickable to expand
   if(S.sessions.length>0){
     html+=`<div class="card" style="margin-top:12px;"><div class="card-title">📅 Past Attendance</div>`;
-    [...S.sessions].reverse().forEach(sess=>{
+    [...S.sessions].reverse().forEach((sess,idx)=>{
       const sAtt=sess.attendance||{};
-      const sPres=Object.entries(sAtt).filter(([,v])=>v==='present').length;
+      const sPres=Object.entries(sAtt).filter(([,v])=>v==='present');
       const sAbs=Object.entries(sAtt).filter(([,v])=>v==='absent');
-      html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;">
-        <strong>Session ${sess.number} — ${sess.date}</strong>: ${sPres} present${sAbs.length?`, ${sAbs.length} absent (${sAbs.map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name.split(' ')[0]||'?').join(', ')})`:' — full attendance'}
+      const isExp=_expandedHist['att'+idx];
+      html+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="_expandedHist['att${idx}']=!_expandedHist['att${idx}'];renderAttendanceTab();">
+          <strong style="font-size:12px;">Session ${sess.number} — ${sess.date}</strong>
+          <div style="display:flex;gap:4px;"><span class="tag tg-green" style="font-size:9px;">✅ ${sPres.length}</span>${sAbs.length?`<span class="tag tg-red" style="font-size:9px;">❌ ${sAbs.length}</span>`:''}</div>
+        </div>
+        ${isExp?`<div style="margin-top:6px;padding:6px;background:var(--s1);border-radius:6px;">
+          ${sPres.length?`<div style="font-size:10px;color:var(--green2);margin-bottom:4px;font-weight:700;">Present (${sPres.length}):</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">${sPres.map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name||'?').join(', ')}</div>`:''}
+          ${sAbs.length?`<div style="font-size:10px;color:var(--red2);font-weight:700;">Absent (${sAbs.length}):</div>
+          <div style="font-size:10px;color:var(--muted);">${sAbs.map(([id])=>S.players.find(p=>p.id===parseInt(id))?.name||'?').join(', ')}</div>`:'<div style="font-size:10px;color:var(--green2);">Full attendance — everyone present!</div>'}
+        </div>`:'<div style="font-size:9px;color:var(--muted);margin-top:2px;">Tap to see details</div>'}
       </div>`;
     });
     html+=`</div>`;
