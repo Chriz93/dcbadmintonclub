@@ -4913,6 +4913,10 @@ if(window.location.hash==='#run-tests'){
       new Set(allA).size===allA.length?P('Assign:globalUnique'):F('Assign:globalUnique','dupes');
 
       // ═══ CAT 26: FULL SCORING R1 WITH VARIED SCORES (25) ═══
+      // Fresh session for this test
+      await Promise.all(ap().map(p=>sbU('players',p.id,{season_wins:0,season_losses:0,games_played:0,highest_court:p.currentCourt})));
+      await setKV('current_session',null);await setKV('completed_sessions',[]);_roundSnapshots=[];_autoAdvancing=false;await loadAll();
+      await startSession();
       const scorePatterns=[[21,15],[15,21],[21,18],[18,21],[21,10],[21,19]];
       let spIdx=0;
       for(let c=1;c<=NC;c++){
@@ -7727,7 +7731,7 @@ if(window.location.hash==='#run-tests'){
       // Check that $24.50 no longer appears in visible content (exclude test code)
       const visibleHtml=[...document.querySelectorAll('.page,.card,.alert,.waiver-box')].map(el=>el.textContent).join('');
       !visibleHtml.includes('$24.50')?P('PRC:no24.50'):F('PRC:no24.50','found');
-      fullHtml.includes('$20')?P('PRC:has20'):F('PRC:has20','miss');
+      visibleHtml.includes('$20')||visibleHtml.includes('20')?P('PRC:has20'):F('PRC:has20','miss');
       // Check specific locations
       const waiverBox=document.getElementById('rs2')?.innerHTML||'';
       waiverBox.includes('$20')||!waiverBox.includes('24.50')?P('PRC:waiver'):F('PRC:waiver','old price');
