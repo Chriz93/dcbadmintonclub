@@ -804,6 +804,8 @@ let regData={};
 let _roundSnapshots=[]; // Stack of pre-rotation snapshots for undo
 // Active players = those with court assignments (admin-added). Excludes registered-but-unassigned (court=0).
 function activePlayers(){return S.players.filter(p=>p.currentCourt>0);}
+// Leaderboard players = active + anyone with stats from past sessions (shows ALL players who've played)
+function leaderboardPlayers(){return S.players.filter(p=>p.currentCourt>0||p.gamesPlayed>0||p.seasonWins>0);}
 
 // ══════════════════════════════════════════════
 // LOAD
@@ -1141,17 +1143,42 @@ function renderHome(){
 }
 
 function renderPOS(elId){
-  const el=document.getElementById(elId);if(!el||!S.sessions.length)return el&&(el.innerHTML='');
-  // Find player with most wins in last session
-  const last=S.sessions[S.sessions.length-1];
-  if(!last||!last.movements)return el.innerHTML='';
-  const wins={};
-  last.movements.forEach(m=>{Object.entries(m.wins||{}).forEach(([id,w])=>{wins[id]=(wins[id]||0)+w;});});
-  const best=Object.entries(wins).sort((a,b)=>b[1]-a[1])[0];
+  const el=document.getElementById(elId);if(!el)return;
+  // Use last completed session, or current session if it has movement data
+  let sess=S.sessions.length?S.sessions[S.sessions.length-1]:null;
+  if(!sess&&S.current&&S.current.movements&&S.current.movements.length>0)sess=S.current;
+  if(!sess||!sess.movements||!sess.movements.length){el.innerHTML='';return;}
+  // Calculate wins per player from movement wins data (authoritative across all rounds)
+  const playerWins={},playerGames={},playerCourt={};
+  // Use movement wins — these cover ALL rounds even when individual scores aren't stored
+  sess.movements.forEach(m=>{
+    Object.entries(m.wins||{}).forEach(([id,w])=>{playerWins[id]=(playerWins[id]||0)+w;});
+  });
+  // Determine court from assignments (use initialAssignments for highest court played)
+  const initA=sess.initialAssignments||sess.assignments;
+  for(let c=1;c<=NC;c++){(initA[c]||[]).forEach(id=>{if(!playerCourt[id])playerCourt[id]=c;});}
+  // Calculate games played from wins data (each round = 3 games per player)
+  Object.keys(playerWins).forEach(id=>{playerGames[id]=sess.movements.length*3;});
+  // Calculate weighted score: wins * court difficulty bonus
+  // Court 1 = 1.5x, Court 2 = 1.33x, Court 3 = 1.17x, Court 4-6 = 1.0x
+  const weighted={};
+  Object.entries(playerWins).forEach(([id,w])=>{
+    const court=playerCourt[id]||NC;
+    const bonus=court<=3?1+(4-court)*0.17:1.0; // C1=1.51, C2=1.34, C3=1.17, C4-6=1.0
+    const games=playerGames[id]||1;
+    const winRate=games>0?w/games:0;
+    // Weighted score combines win count, court difficulty, and win rate
+    weighted[id]=w*bonus+winRate*0.5;
+  });
+  const best=Object.entries(weighted).sort((a,b)=>b[1]-a[1])[0];
   if(!best)return el.innerHTML='';
-  const p=S.players.find(x=>x.id===parseInt(best[0]));
+  const pid=parseInt(best[0]);
+  const p=S.players.find(x=>x.id===pid);
   if(!p)return el.innerHTML='';
-  el.innerHTML=`<div class="pos-banner"><div class="pos-crown">👑</div><div class="pos-title">Player of Session ${last.number}</div><div class="pos-name">${esc(p.name)}</div><div class="pos-stat">${best[1]} wins · Session ${last.number} — ${last.date}</div></div>`;
+  const wins=playerWins[pid]||0;
+  const games=playerGames[pid]||0;
+  const court=playerCourt[pid]||'?';
+  el.innerHTML=`<div class="pos-banner"><div class="pos-crown">👑</div><div class="pos-title">Player of Session ${sess.number}</div><div class="pos-name">${esc(p.name)}</div><div class="pos-stat">${wins}W ${games-wins}L on Court ${court} · Session ${sess.number} — ${sess.date}</div></div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -2889,10 +2916,11 @@ async function saveScores(court){
 // ══════════════════════════════════════════════
 function renderLeaderboard(){
   const el=document.getElementById('sec-lb');if(!el)return;
-  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">🏆</div><div class="em">No active players yet</div></div>';return;}
+  const lbPlayers=leaderboardPlayers();
+  if(!lbPlayers.length){el.innerHTML='<div class="empty-state"><div class="ei">🏆</div><div class="em">No active players yet</div></div>';return;}
   // Compute current round wins/losses from live scores
   const liveWins={},liveLosses={};
-  activePlayers().forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;});
+  lbPlayers.forEach(p=>{liveWins[p.id]=0;liveLosses[p.id]=0;});
   if(S.current){
     const cy=S.current.cycle;
     for(let c=1;c<=NC;c++){
@@ -2908,30 +2936,65 @@ function renderLeaderboard(){
     }
   }
   const hasLive=Object.values(liveWins).some(v=>v>0);
-  // Use session court position if active, otherwise DB court
+  // Use session court position if active, otherwise DB court (0 = not playing this session)
   const getCourtPos=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
-  const sorted=[...activePlayers()].sort((a,b)=>{
-    // Primary: court placement (ladder position — this IS the ranking)
-    const ca=getCourtPos(a),cb=getCourtPos(b);
-    if(ca!==cb)return ca-cb;
+  // Get last known court from completed sessions for inactive players
+  const getLastCourt=(p)=>{
+    if(p.currentCourt>0)return p.currentCourt;
+    // Check completed sessions for last known position
+    for(let i=S.sessions.length-1;i>=0;i--){
+      const s=S.sessions[i];if(!s||!s.assignments)continue;
+      for(let c=1;c<=NC;c++){if((s.assignments[c]||[]).includes(p.id))return c;}
+    }
+    // Check current session assignments
+    if(S.current&&S.current.assignments){
+      for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}
+    }
+    return NC+1; // unknown, sort last
+  };
+  const sorted=[...lbPlayers].sort((a,b)=>{
+    const activeA=a.currentCourt>0,activeB=b.currentCourt>0;
+    // Active players always ranked above inactive (absent this session)
+    if(activeA&&!activeB)return -1;
+    if(!activeA&&activeB)return 1;
+    if(activeA&&activeB){
+      // Both active: primary = court position
+      const ca=getCourtPos(a),cb=getCourtPos(b);
+      if(ca!==cb)return ca-cb;
+    }else{
+      // Both inactive: sort by last known court, then wins
+      const la=getLastCourt(a),lb=getLastCourt(b);
+      if(la!==lb)return la-lb;
+    }
     // Secondary: total wins
     const totalW_a=a.seasonWins+(liveWins[a.id]||0),totalW_b=b.seasonWins+(liveWins[b.id]||0);
     if(totalW_b!==totalW_a)return totalW_b-totalW_a;
-    // Tertiary: total points scored
+    // Tertiary: win rate
     const gp_a=a.gamesPlayed+(liveWins[a.id]||0)+(liveLosses[a.id]||0),gp_b=b.gamesPlayed+(liveWins[b.id]||0)+(liveLosses[b.id]||0);
     const wr_a=gp_a>0?totalW_a/gp_a:0,wr_b=gp_b>0?totalW_b/gp_b:0;
     return wr_b-wr_a;
   });
+  // Count active vs inactive for section headers
+  const activeCount=sorted.filter(p=>p.currentCourt>0).length;
+  const inactiveCount=sorted.length-activeCount;
+  let prevActive=true;
   el.innerHTML=(hasLive?`<div class="alert alert-info" style="margin-bottom:10px;font-size:11px;">📊 Standings include live Round ${S.current.cycle} scores (unsaved to season totals until round advances)</div>`:'')+sorted.map((p,i)=>{
-    const courtPos=getCourtPos(p);
+    const isActive=p.currentCourt>0;
+    const courtPos=isActive?getCourtPos(p):0;
+    const displayCourt=courtPos>0?courtPos:getLastCourt(p);
     const totalW=p.seasonWins+(liveWins[p.id]||0),totalL=p.seasonLosses+(liveLosses[p.id]||0);
     const totalGP=p.gamesPlayed+(liveWins[p.id]||0)+(liveLosses[p.id]||0);
     const wr=totalGP>0?Math.round(totalW/totalGP*100):0;
     const liveTag=(liveWins[p.id]||0)>0||(liveLosses[p.id]||0)>0?` <span style="color:var(--yellow2);font-size:9px;">(+${liveWins[p.id]||0}W live)</span>`:'';
-    return `<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
+    const absentTag=!isActive?'<span style="color:var(--muted);font-size:9px;margin-left:4px;">(absent)</span>':'';
+    // Insert section divider before inactive players
+    let divider='';
+    if(!isActive&&prevActive&&inactiveCount>0){divider=`<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border);margin-top:8px;">Not Playing This Session</div>`;prevActive=false;}
+    const courtLabel=isActive?`Court ${displayCourt}`:`Last: C${displayCourt<=NC?displayCourt:'?'}`;
+    return divider+`<div class="lbrow" style="cursor:pointer;${!isActive?'opacity:0.7;':''}" onclick="renderGameHistory(${p.id})">
       <div class="lbrank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
       ${avatar(p.name)}
-      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${liveTag}</div><div class="lbsub">Court ${courtPos} · ${totalW}W ${totalL}L · ${wr}% · <span style="color:var(--teal2);">tap for history</span></div></div>
+      <div class="lbinfo"><div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${absentTag}${liveTag}</div><div class="lbsub">${courtLabel} · ${totalW}W ${totalL}L · ${wr}% · <span style="color:var(--teal2);">tap for history</span></div></div>
       <div class="lbnums">
         <div class="lbnum"><div class="v">${totalW}</div><div class="l">W</div></div>
         <div class="lbnum"><div class="v">${totalL}</div><div class="l">L</div></div>
@@ -2943,7 +3006,10 @@ function computeEloRatings(){
   // Performance-weighted ELO: winning on higher courts earns more, losing on lower costs more
   const elo={};
   // Starting ELO based on initial court: C1=1500, C2=1400, ..., C6=1000
-  activePlayers().forEach(p=>{elo[p.id]=1500-((p.currentCourt-1)*100);});
+  leaderboardPlayers().forEach(p=>{
+    const court=p.currentCourt>0?p.currentCourt:NC; // inactive players start at lowest
+    elo[p.id]=1500-((court-1)*100);
+  });
   // Process all completed sessions
   const allSess=[...S.sessions].filter(Boolean);
   if(S.current)allSess.push(S.current);
@@ -3003,16 +3069,18 @@ function computeEloRatings(){
 }
 function renderRankings(){
   const el=document.getElementById('sec-rank');if(!el)return;
-  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No active players yet</div></div>';return;}
+  const lbPlayers=leaderboardPlayers();
+  if(!lbPlayers.length){el.innerHTML='<div class="empty-state"><div class="ei">🎯</div><div class="em">No active players yet</div></div>';return;}
   const elo=computeEloRatings();
   const getCourtPos2=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
-  const ranked=[...activePlayers()].map(p=>{
-    const courtPos=getCourtPos2(p);
+  const ranked=[...lbPlayers].map(p=>{
+    const courtPos=getCourtPos2(p)||p.currentCourt;
     const totalW=p.seasonWins,totalL=p.seasonLosses;
     const totalGP=p.gamesPlayed;
     const wr=totalGP>0?Math.round(totalW/totalGP*100):0;
     const rating=elo[p.id]||1000;
-    return{...p,courtPos,totalW,totalL,totalGP,wr,rating};
+    const isActive=p.currentCourt>0;
+    return{...p,courtPos,totalW,totalL,totalGP,wr,rating,isActive};
   }).sort((a,b)=>b.rating-a.rating); // Sort purely by ELO rating
   let html=`<div class="card"><div class="card-title">🎯 Player Rankings (ELO)</div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Performance-weighted rating: winning on higher courts earns more. A lower-court player CAN out-rank a higher-court player through consistent wins.</div>`;
@@ -3020,12 +3088,13 @@ function renderRankings(){
     const ratingColor=p.rating>=1500?'var(--gold)':p.rating>=1300?'var(--green2)':p.rating>=1100?'var(--teal2)':'var(--muted)';
     const courtCls=p.courtPos===1?'var(--gold)':p.courtPos===2?'var(--silver)':p.courtPos===3?'var(--bronze)':'var(--teal2)';
     const trend=p.rating>=1500-(p.courtPos-1)*100+50?'📈':p.rating<=1500-(p.courtPos-1)*100-50?'📉':'';
-    html+=`<div class="lbrow" style="cursor:pointer;" onclick="renderGameHistory(${p.id})">
+    const absentTag=!p.isActive?'<span style="color:var(--muted);font-size:9px;margin-left:4px;">(absent)</span>':'';
+    html+=`<div class="lbrow" style="cursor:pointer;${!p.isActive?'opacity:0.7;':''}" onclick="renderGameHistory(${p.id})">
       <div style="font-size:14px;font-weight:900;width:28px;text-align:center;flex-shrink:0;color:${i<3?'var(--gold)':'var(--muted)'};">${i+1}</div>
       ${avatar(p.name)}
       <div class="lbinfo">
-        <div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${trend?' <span style="font-size:12px;">'+trend+'</span>':''}</div>
-        <div class="lbsub">Court ${p.courtPos} · ${p.totalW}W ${p.totalL}L · ${p.wr}%</div>
+        <div class="lbname">${esc(p.name)}${p.membershipType==='spare'?'<span class="spare-badge">SPARE</span>':''}${absentTag}${trend?' <span style="font-size:12px;">'+trend+'</span>':''}</div>
+        <div class="lbsub">${p.isActive?'Court '+p.courtPos:'Absent'} · ${p.totalW}W ${p.totalL}L · ${p.wr}%</div>
       </div>
       <div style="text-align:center;">
         <div style="font-size:18px;font-weight:900;color:${ratingColor};">${p.rating}</div>
@@ -3090,9 +3159,14 @@ function computePlayerStreakAndImprovement(){
 }
 function renderPlayerStats(){
   const el=document.getElementById('sec-pstats');if(!el)return;
-  if(!activePlayers().length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
-  const getCP=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt;};
-  const ap=[...activePlayers()].sort((a,b)=>getCP(a)-getCP(b));
+  const lbPlayers=leaderboardPlayers();
+  if(!lbPlayers.length){el.innerHTML='<div class="empty-state"><div class="ei">📊</div><div class="em">No data yet</div></div>';return;}
+  const getCP=(p)=>{if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id))return c;}}return p.currentCourt||NC+1;};
+  const ap=[...lbPlayers].sort((a,b)=>{
+    const activeA=a.currentCourt>0,activeB=b.currentCourt>0;
+    if(activeA&&!activeB)return -1;if(!activeA&&activeB)return 1;
+    return getCP(a)-getCP(b);
+  });
   const displayPlayers = adminUnlocked ? ap : ap.map(p=>({...p, email:'', phone:'', emergency:'', medical:''}));
   // Compute awards (only active players)
   const streakData=computePlayerStreakAndImprovement();
@@ -3138,14 +3212,16 @@ function renderPlayerStats(){
     // Find current court in session (may differ from DB during active session)
     let displayCourt=p.currentCourt;
     if(S.current){for(let c=1;c<=NC;c++){if((S.current.assignments[c]||[]).includes(p.id)){displayCourt=c;break;}}}
-    return `<div class="card"><div class="flex-between" style="margin-bottom:10px;">
+    const isAbsent=p.currentCourt===0;
+    const courtTag=isAbsent?'<span class="tag tg-gray">Absent</span>':`<span class="tag tg-teal">Court ${displayCourt}</span>`;
+    return `<div class="card" style="${isAbsent?'opacity:0.7;':''}"><div class="flex-between" style="margin-bottom:10px;">
       <div style="font-weight:800;font-size:15px;">${esc(p.name)}${awards.length?` <span style="font-size:14px;">${awards.join('')}</span>`:''}</div>
-      <span class="tag tg-teal">Court ${displayCourt}</span></div>
+      ${courtTag}</div>
       <div class="sgrid">
         <div class="sbox"><div class="sv">${totalW}</div><div class="sl">Wins${lw>0?' <span style="color:var(--yellow2);font-size:8px;">(+'+lw+' live)</span>':''}</div></div>
         <div class="sbox"><div class="sv">${totalL}</div><div class="sl">Losses${ll>0?' <span style="color:var(--yellow2);font-size:8px;">(+'+ll+' live)</span>':''}</div></div>
         <div class="sbox"><div class="sv">${liveWr}%</div><div class="sl">Win Rate</div></div>
-        <div class="sbox"><div class="sv">C${Math.min(displayCourt,p.highestCourt||displayCourt)}</div><div class="sl">Best Court</div></div>
+        <div class="sbox"><div class="sv">C${Math.min(displayCourt||NC,p.highestCourt||displayCourt||NC)}</div><div class="sl">Best Court</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;">
         <div>🔥 Current streak: <strong>${sd.streak||0}</strong></div>
@@ -3166,7 +3242,7 @@ function renderHeatmap(){
     <div style="display:flex;gap:4px;margin-bottom:10px;font-size:9px;color:var(--muted);">
       ${S.sessions.map(s=>`<div style="flex:1;text-align:center;">S${s.number}</div>`).join('')}
     </div>
-    ${activePlayers().map(p=>`<div class="heatmap-row">
+    ${leaderboardPlayers().map(p=>`<div class="heatmap-row">
       <div class="heatmap-name">${esc(p.name.split(' ')[0])}</div>
       <div class="heatmap-cells">
         ${S.sessions.map(s=>{
@@ -4423,16 +4499,19 @@ if(window.location.hash==='#run-tests'){
       const approvedSection=regHtml.includes('Approved')?regHtml.substring(regHtml.indexOf('Approved')):'';
       const adminInApproved=S.players.filter(p=>p.sig==='admin').some(p=>approvedSection.includes(esc(p.name)));
       !adminInApproved?P('Iso:regNoAdmin'):F('Iso:regNoAdmin','admin in approved');
-      // Leaderboard exclusion
+      // Leaderboard: court-0 players WITH stats ARE shown (leaderboardPlayers includes them)
       renderLeaderboard();
       const lbHtml=document.getElementById('sec-lb')?.innerHTML||'';
-      const c0inLb=c0.some(p=>p.name.length>3&&lbHtml.includes(esc(p.name)));
-      !c0inLb||c0.length===0?P('Iso:lbClean'):F('Iso:lbClean','c0 in lb');
-      // Rankings exclusion
+      const c0WithStats=c0.filter(p=>p.gamesPlayed>0||p.seasonWins>0);
+      const c0NoStats=c0.filter(p=>!p.gamesPlayed&&!p.seasonWins);
+      const c0StatsInLb=c0WithStats.length===0||c0WithStats.some(p=>p.name.length>3&&lbHtml.includes(esc(p.name)));
+      const c0NoStatsNotInLb=c0NoStats.length===0||!c0NoStats.some(p=>p.name.length>3&&lbHtml.includes(esc(p.name)));
+      c0StatsInLb&&c0NoStatsNotInLb?P('Iso:lbClean'):F('Iso:lbClean','c0 stats visibility wrong');
+      // Rankings: same — court-0 with stats shown, without stats hidden
       renderRankings();
       const rkHtml=document.getElementById('sec-rank')?.innerHTML||'';
-      const c0inRk=c0.some(p=>p.name.length>3&&rkHtml.includes(esc(p.name)));
-      !c0inRk||c0.length===0?P('Iso:rkClean'):F('Iso:rkClean','c0 in rank');
+      const c0StatsInRk=c0WithStats.length===0||c0WithStats.some(p=>p.name.length>3&&rkHtml.includes(esc(p.name)));
+      c0StatsInRk?P('Iso:rkClean'):F('Iso:rkClean','c0 stats missing in rank');
       P('Iso:heatmap');P('Iso:playerStats');P('Iso:awards');P('Iso:PDF');P('Iso:absentDD');P('Iso:lateDD');P('Iso:courtAdd');
 
       // ═══ CAT 4: GAME COMBOS (10) ═══
@@ -5114,7 +5193,7 @@ if(window.location.hash==='#run-tests'){
       firstCourtMatch&&firstCourtMatch[1]==='1'?P('LB:court1first'):F('LB:court1first','got C'+firstCourtMatch?.[1]);
       // Count player entries (lbrow class)
       const lbCount=(lb4.match(/lbrow/g)||[]).length;
-      lbCount===ap().length?P('LB:allPlayersShown'):F('LB:allPlayersShown','got '+lbCount+' expected '+ap().length);
+      lbCount===leaderboardPlayers().length?P('LB:allPlayersShown'):F('LB:allPlayersShown','got '+lbCount+' expected '+leaderboardPlayers().length);
       // Live scores indicator
       S.current?(lb4.includes('live')?P('LB:liveIndicator'):F('LB:liveIndicator','miss')):P('LB:noLiveNeeded');
       P('LB:sorted');P('LB:formatted');P('LB:clickable');
@@ -5138,7 +5217,7 @@ if(window.location.hash==='#run-tests'){
       const ratingMatches=rk4.match(/\d{3,5}/g)||[];
       ratingMatches.length>0?P('Rank:hasRatingNums'):F('Rank:hasRatingNums','none');
       // All active players present
-      (rk4.match(/lbrow/g)||[]).length===ap().length?P('Rank:allPlayers'):F('Rank:allPlayers','count mismatch');
+      (rk4.match(/lbrow/g)||[]).length===leaderboardPlayers().length?P('Rank:allPlayers'):F('Rank:allPlayers','count mismatch');
       P('Rank:sorted');P('Rank:courtBased');P('Rank:winBased');P('Rank:wrBased');
       ap().every(p=>rk4.includes(esc(p.name)))?P('Rank:allNames'):F('Rank:allNames','miss');
       P('Rank:clickable');P('Rank:formatted');P('Rank:ratingColors');P('Rank:courtColors');
@@ -5973,7 +6052,7 @@ if(window.location.hash==='#run-tests'){
       c1players.some(p=>firstName.includes(p.name.split(' ')[0]))?P('LBW:court1First'):F('LBW:court1First','got: '+firstName);
       // Verify all players shown
       const lbRowCount=(lbWins.match(/lbrow/g)||[]).length;
-      lbRowCount===activePlayers().length?P('LBW:allShown'):F('LBW:allShown','got '+lbRowCount);
+      lbRowCount===leaderboardPlayers().length?P('LBW:allShown'):F('LBW:allShown','got '+lbRowCount);
       // No NaN
       !lbWins.includes('NaN')?P('LBW:noNaN'):F('LBW:noNaN','found');
       !lbWins.includes('undefined')?P('LBW:noUndef'):F('LBW:noUndef','found');
