@@ -1220,6 +1220,13 @@ async function addPlayer(){
     approvals[existingReg.id]={...(approvals[existingReg.id]||{}),approved:true};
     await setKV('player_approvals',approvals);
     const mo=await getKV('membership_overrides')||{};mo[existingReg.id]=mtype;await setKV('membership_overrides',mo);
+    // Sync active session assignments
+    if(S.current&&court>0&&court<=NC){
+      for(let cc=1;cc<=NC;cc++){S.current.assignments[cc]=(S.current.assignments[cc]||[]).filter(pid=>pid!==existingReg.id);}
+      S.current.assignments[court]=(S.current.assignments[court]||[]);
+      if(!S.current.assignments[court].includes(existingReg.id))S.current.assignments[court].push(existingReg.id);
+      await setKV('current_session',S.current);
+    }
     await loadAll();renderAll();toast(`${existingReg.name} activated from registration → Court ${court}`,'success');return;
   }
   // Check for true duplicates (already active on a court)
@@ -1237,6 +1244,12 @@ async function addPlayer(){
     const overrides=await getKV('membership_overrides')||{};
     overrides[res[0].id]=mtype;
     await setKV('membership_overrides',overrides);
+  }
+  // Sync active session assignments — critical so Courts tab shows new player
+  if(S.current&&pid&&court>0&&court<=NC){
+    S.current.assignments[court]=(S.current.assignments[court]||[]);
+    if(!S.current.assignments[court].includes(pid))S.current.assignments[court].push(pid);
+    await setKV('current_session',S.current);
   }
   document.getElementById('np-name').value='';
   await loadAll();renderAll();toast(name+' added as '+mtype+'!','success');
