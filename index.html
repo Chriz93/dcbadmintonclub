@@ -4375,6 +4375,12 @@ if(window.location.hash==='#run-tests'){
       const P=(n)=>R.push({n,s:'P'});
       const F=(n,r)=>R.push({n,s:'F',r});
       const ap=()=>activePlayers();
+      // ═══ SAVE REAL DATA before tests ═══
+      const _savedSession=await getKV('current_session');
+      const _savedCompleted=await getKV('completed_sessions');
+      const _savedPlayerStats=S.players.map(p=>({id:p.id,w:p.seasonWins,l:p.seasonLosses,gp:p.gamesPlayed,hc:p.highestCourt,cc:p.currentCourt}));
+      const _savedSnapshots=await getKV('round_snapshots');
+      const _savedPreAtt=await getKV('pre_session_attendance');
       try{
       // ═══ CAT 1: CORE FUNCTIONS (10) ═══
       typeof activePlayers==='function'?P('Fn:activePlayers'):F('Fn:activePlayers','undef');
@@ -7985,6 +7991,19 @@ if(window.location.hash==='#run-tests'){
       // FINAL CLEANUP
 
       }catch(e){F('CRASH:'+e.message,e.stack?.substring(0,200));}
+
+      // ═══ RESTORE REAL DATA after tests ═══
+      try{
+        await setKV('current_session',_savedSession);
+        await setKV('completed_sessions',_savedCompleted);
+        await setKV('round_snapshots',_savedSnapshots);
+        await setKV('pre_session_attendance',_savedPreAtt);
+        // Restore player stats
+        if(_savedPlayerStats&&_savedPlayerStats.length){
+          await Promise.all(_savedPlayerStats.map(ps=>sbU('players',ps.id,{season_wins:ps.w,season_losses:ps.l,games_played:ps.gp,highest_court:ps.hc,current_court:ps.cc})));
+        }
+        await loadAll();
+      }catch(restoreErr){console.error('Failed to restore data after tests:',restoreErr);}
 
       // Store results and redirect
       localStorage.setItem('dcbc-test-results',JSON.stringify({results:R,ts:Date.now()}));
