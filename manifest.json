@@ -1,7 +1,7 @@
 {
-  "name": "DC Badminton Club",
-  "short_name": "DC Badminton",
-  "description": "Maplewood Advanced League - Score tracking, standings & court management",
+  "name": "DC Badminton Club — TEST",
+  "short_name": "DCB Test",
+  "description": "TEST environment - safe to break. Maplewood Advanced League",
   "start_url": "/dcbadmintonclub/",
   "display": "standalone",
   "background_color": "#080e17",
