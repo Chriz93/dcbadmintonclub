@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'dcbc-prod-';
-const CACHE_NAME = CACHE_PREFIX + 'dcbc-v46';
+const CACHE_NAME = CACHE_PREFIX + 'dcbc-v47';
 const BASE = new URL('./', self.location.href);
 const ASSETS = ['', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'].map(p => new URL(p, BASE).href);
 self.addEventListener('install', e => {
